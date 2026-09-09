@@ -1,0 +1,30 @@
+# k3s ships Traefik as its default ingress controller. Change the host to
+# whatever you point at the cluster, then re-apply.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: beer-darts
+  labels:
+    app.kubernetes.io/name: beer-darts
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    # For TLS via cert-manager, switch the entrypoint to websecure, uncomment
+    # the tls block below, and add:
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: darts.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: beer-darts
+                port:
+                  name: http
+  # tls:
+  #   - hosts:
+  #       - darts.local
+  #     secretName: beer-darts-tls

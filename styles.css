@@ -1,0 +1,805 @@
+:root {
+  --bg: #0b0f14;
+  --panel: #151c26;
+  --panel2: #1c2532;
+  --line: #26313f;
+  --txt: #eaf0f7;
+  --dim: #8ba0b8;
+  --accent: #2ee27f;
+  --amber: #ffc94d;
+  --red: #ff5f5f;
+  --r: 14px;
+  --gap: 6px;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--txt);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  overflow: hidden;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+button:disabled { opacity: .32; pointer-events: none; }
+
+/* iOS Safari's 100vh is the toolbar-HIDDEN height, so a full-height app runs
+   off the bottom of the screen and the last keypad row hides under the
+   toolbar. dvh fixes that but needs Safari 15.4+, which rules out anything
+   older (an iPad mini 3 tops out at iOS 12). The JS-measured value is the
+   only one every browser agrees on, so it wins when available. */
+#app { height: 100vh; height: 100dvh; }
+html.js-vh #app { height: var(--app-h); }
+
+.screen { display: none; height: 100%; flex-direction: column; }
+.screen.active { display: flex; }
+
+/* ── bars ──────────────────────────────────────────────────── */
+.topbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: max(6px, env(safe-area-inset-top)) 10px 6px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.topinfo {
+  flex: 1;
+  text-align: center;
+  font-size: 13px;
+  color: var(--dim);
+  letter-spacing: .02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.brand { flex: 1; font-size: 20px; font-weight: 700; letter-spacing: .01em; }
+.brand span { color: var(--accent); }
+
+.bottombar {
+  flex: 0 0 auto;
+  padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+/* ── buttons ───────────────────────────────────────────────── */
+.btn {
+  min-height: 48px;
+  min-width: 48px;
+  padding: 0 16px;
+  border-radius: var(--r);
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  font-weight: 600;
+  transition: transform .06s, background .12s;
+}
+.btn:active { transform: scale(.96); background: #26303f; }
+.btn.ghost { background: transparent; border-color: transparent; font-size: 22px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #06210f; }
+.btn.danger { background: var(--red); border-color: var(--red); color: #2a0808; }
+.btn.wide { width: 100%; }
+.btn.xl { width: 100%; min-height: 62px; font-size: 20px; }
+
+/* ── setup ─────────────────────────────────────────────────── */
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.panel h2 {
+  margin: 14px 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--dim);
+}
+.panel h2:first-child { margin-top: 2px; }
+.hint { margin: 10px 2px 0; font-size: 12.5px; line-height: 1.5; color: var(--dim); }
+
+.seg { display: flex; gap: var(--gap); flex-wrap: wrap; }
+.seg-btn {
+  flex: 1 1 auto;
+  min-width: 62px;
+  min-height: 52px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  font-weight: 600;
+  font-size: 15px;
+  transition: transform .06s;
+}
+.seg-btn:active { transform: scale(.96); }
+.seg-btn.active { background: var(--accent); border-color: var(--accent); color: #06210f; }
+.seg.xl { margin-bottom: 12px; }
+.seg.xl .seg-btn { min-height: 66px; font-size: 20px; font-weight: 700; }
+
+/* Throwing order, so a list rather than a bag of chips. */
+.player-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+.prow {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.prow-n {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--accent);
+  background: rgba(46, 226, 127, .08);
+}
+.prow-name {
+  flex: 1;
+  min-width: 0;
+  min-height: 52px;
+  padding: 0 12px;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prow-btn {
+  flex: 0 0 auto;
+  width: 44px;
+  color: var(--dim);
+  font-size: 18px;
+  border-left: 1px solid var(--line);
+}
+.prow-btn:active { background: #2b3a4a; color: var(--txt); }
+.prow-btn.del { font-size: 22px; }
+.prow-btn.del:active { background: var(--red); color: #fff; }
+
+/* Roster picker */
+.roster { display: flex; flex-direction: column; gap: 4px; max-height: 56vh; max-height: 56dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.roster .empty { text-align: center; padding: 18px 0; }
+/* 14 rows overflow the list's max-height, so these are under shrink pressure.
+   Chromium is saved by the automatic min-height:auto floor, but this is a
+   flex container nested in a flex column with its min-height on the child --
+   exactly where WebKit's automatic minimum size differs, squashing rows until
+   their content spills onto the row below. State the floor explicitly and let
+   the list scroll, which is what overflow-y:auto is there for. */
+.rrow-wrap { display: flex; align-items: stretch; gap: 2px; flex-shrink: 0; min-height: 50px; }
+.rrow {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 50px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  text-align: left;
+}
+.rrow.on { background: #16241c; border-color: var(--accent); }
+.rrow:active { transform: scale(.99); }
+.rr-check {
+  flex: 0 0 auto;
+  width: 18px;
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 15px;
+}
+.rr-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rr-del {
+  flex: 0 0 auto;
+  width: 38px;
+  border-radius: 10px;
+  color: #4e6076;
+  font-size: 19px;
+  border: 1px solid transparent;
+}
+.rr-del:active { background: var(--red); color: #fff; }
+
+/* ── player cards ──────────────────────────────────────────── */
+.players {
+  flex: 0 0 auto;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(112px, 1fr);
+  gap: var(--gap);
+  padding: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.players::-webkit-scrollbar { display: none; }
+.pcard {
+  position: relative;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  min-width: 0;
+}
+.pcard.on { border-color: var(--accent); background: #16241c; }
+.pc-top { display: flex; align-items: baseline; gap: 6px; }
+.pc-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pcard.on .pc-name { color: var(--accent); }
+.pc-legs {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--amber);
+  background: #2a2415;
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+.pc-score { font-size: 26px; font-size: clamp(24px, 4.4vh, 34px); font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.pc-meta { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.pc-tag { margin-top: 3px; font-size: 10.5px; color: var(--amber); }
+
+/* ── x01 focus panel ───────────────────────────────────────── */
+.focus {
+  position: relative;
+  /* Yields before the keypad does. .focus-score has flex-shrink:0 so its box
+     always holds its text; if space runs out the number crops here rather than
+     the keypad losing its bottom row off the screen. */
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 4px 10px 8px;
+  overflow: hidden;
+}
+.focus-name { font-size: 14px; font-weight: 600; color: var(--accent); letter-spacing: .03em; }
+.focus-score {
+  /* dvh matches #app; bare vh is the tall viewport and oversizes on phones. */
+  font-size: 64px;                          /* no clamp() before Safari 13.1 */
+  font-size: clamp(34px, 9.5vh, 132px);
+  font-size: clamp(34px, 9.5dvh, 132px);
+  font-weight: 800;
+  /* Under ~1.15 the glyph em box spills past the line box. */
+  line-height: 1.15;
+  /* Never shrink below the text: a squashed box paints its digits over the
+     row beneath instead of clipping. */
+  flex-shrink: 0;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.turnzone { flex: 0 0 auto; display: flex; justify-content: center; padding: 0 8px 8px; }
+.turnrow { position: relative; display: flex; align-items: center; gap: var(--gap); }
+.dslot {
+  min-width: 62px;
+  padding: 5px 8px;
+  text-align: center;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--dim);
+}
+.dslot.sm { min-width: 52px; font-size: 13px; padding: 4px 6px; }
+.dslot.wide { min-width: 190px; font-size: 22px; font-variant-numeric: tabular-nums; }
+.dslot.filled { color: var(--txt); border-color: #3a4a5e; background: var(--panel2); }
+.dslot .ph { color: #55677d; font-size: 15px; font-weight: 500; }
+.turntotal {
+  /* Taken out of flow so the dart slots stay centred on screen. */
+  position: absolute;
+  left: calc(100% + var(--gap));
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 46px;
+  text-align: left;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--amber);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── checkout ──────────────────────────────────────────────── */
+.checkout {
+  flex: 0 0 auto;
+  margin: 0;
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.checkout.off { color: #4e6076; font-size: 13px; }
+.checkout.warn { color: var(--amber); font-size: 13.5px; background: #241f12; border-color: #4a3f1e; }
+.checkout.on { border-color: var(--accent); background: #13251b; }
+.co-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); }
+.co-main { display: flex; gap: var(--gap); flex-wrap: wrap; justify-content: center; }
+.co-dart {
+  padding: 3px 12px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #06210f;
+  font-size: 19px;
+  font-size: clamp(17px, 3vh, 23px);
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+.co-alt { font-size: 12px; color: var(--dim); font-weight: 600; }
+.co-alt .sep { margin: 0 7px; color: #46586d; font-weight: 400; }
+
+.flash {
+  position: absolute;
+  top: 4px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dim);
+  animation: pop .25s ease-out;
+}
+.flash.bust { background: #351313; border-color: var(--red); color: var(--red); }
+@keyframes pop { from { opacity: 0; transform: translateY(-6px); } }
+
+/* ── keypads ───────────────────────────────────────────────── */
+.pad {
+  /* Content-based basis so it never over-claims, but a heavier grow weight
+     than .focus: spare height is worth more to the keypad than to the score,
+     and an even 1:1 split left the number keys at ~33px. */
+  flex: 3 1 auto;
+  /* Never shrink below the rows: multrow/slangrow/botrow are flex:0 0 auto and
+     cannot compress, so a shrunken .pad pushes its last row off the screen. */
+  min-height: min-content;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  padding: 0 8px max(8px, env(safe-area-inset-bottom));
+}
+.key {
+  border-radius: 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  font-weight: 700;
+  font-size: 18px;
+  font-size: clamp(16px, 2.6vh, 22px);
+  transition: transform .05s, background .1s;
+  min-height: 0;
+}
+.key:active { transform: scale(.94); background: #31404f; }
+
+.multrow { flex: 0 0 auto; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--gap); }
+.multrow .key { min-height: 54px; font-size: 14px; letter-spacing: .06em; }
+.key.mult.on { background: var(--amber); border-color: var(--amber); color: #2a2003; }
+
+/* Nested flex rows, not Grid. Grid fr-track sizing behaves differently on
+   Safari 12, which left the bottom rows overflowing their box. `flex: 1 1 0`
+   with `min-height: 0` distributes and shrinks identically on every engine. */
+.numgrid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  overflow: hidden;
+}
+.numrow {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  gap: var(--gap);
+}
+.numrow > .key { flex: 1 1 0; min-width: 0; }
+.slangrow { flex: 0 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); }
+.slangrow .key { min-height: 58px; }
+.botrow { flex: 0 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gap); }
+.botrow .key { min-height: 58px; font-size: 15px; }
+.key.alt { background: var(--panel); }
+.key.go { background: var(--accent); border-color: var(--accent); color: #06210f; }
+
+.pad.total .quickrow {
+  flex: 0 0 auto;
+  display: grid;
+  /* 8 named chips: two even rows of four. */
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--gap);
+}
+.pad.total .quickrow .key { min-height: 50px; }
+.key.quick { overflow: hidden; }
+.key.quick, .key.slang {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  line-height: 1.05;
+  padding: 2px;
+}
+.q-name {
+  font-size: 11px;
+  font-size: clamp(10px, 2.6vw, 13px);
+  font-weight: 800;
+  letter-spacing: .03em;
+  line-height: 1.05;
+  text-transform: uppercase;
+  color: var(--amber);
+  text-align: center;
+}
+.q-emoji {
+  font-size: 20px;
+  font-size: clamp(13px, 3.4vw, 24px);
+  letter-spacing: -.5px;
+  line-height: 1;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
+}
+.key.slang .q-emoji { font-size: 28px; }
+.q-val { font-size: 16px; font-weight: 800; color: var(--amber); font-variant-numeric: tabular-nums; }
+.key.slang .q-val { font-size: 15px; }
+.pad.total .numpad {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  overflow: hidden;
+}
+
+/* ── cricket grid ──────────────────────────────────────────── */
+.cgrid {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(56px, 14%) repeat(var(--cols), 1fr);
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 3px;
+  padding: 6px;
+}
+.ch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 2px;
+  min-width: 0;
+}
+.ch.on { border-color: var(--accent); background: #16241c; }
+.ch.corner { background: none; border: 0; }
+.ch-name {
+  max-width: 100%;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ch.on .ch-name { color: var(--accent); }
+.ch-score { font-size: 22px; font-size: clamp(19px, 3.4vh, 27px); font-weight: 800; font-variant-numeric: tabular-nums; }
+.ch-legs { font-size: 10px; color: var(--amber); }
+
+.ct {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-size: clamp(17px, 3vh, 24px);
+  font-weight: 800;
+  color: var(--amber);
+  letter-spacing: .02em;
+}
+.ct.dead { color: #44546a; text-decoration: line-through; }
+
+.cc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--dim);
+  transition: transform .05s, background .1s;
+}
+.cc.on { background: var(--panel2); border-color: #37485c; color: var(--accent); }
+.cc.on:active { transform: scale(.93); background: #2b3a4a; }
+.cc.closed { color: var(--accent); }
+.cc.dead { opacity: .3; }
+.cc:disabled { opacity: .55; pointer-events: none; }
+
+/* Cricket marks: / then X then a ringed X. */
+/* Height, not aspect-ratio, is the fallback: without it these empty spans
+   collapse to zero and the marks disappear (Safari gained aspect-ratio in 15). */
+.mk { position: relative; width: 54%; max-width: 46px; height: 34px; }
+@supports (aspect-ratio: 1) {
+  .mk { height: auto; aspect-ratio: 1; }
+}
+.mk::before, .mk::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 10%;
+  width: 11%;
+  height: 80%;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0;
+}
+.mk::before { transform: translateX(-50%) rotate(38deg); }
+.mk::after { transform: translateX(-50%) rotate(-38deg); }
+.mk[data-m="1"]::before,
+.mk[data-m="2"]::before, .mk[data-m="2"]::after,
+.mk[data-m="3"]::before, .mk[data-m="3"]::after { opacity: 1; }
+.mk[data-m="3"] { border: 2.5px solid currentColor; border-radius: 50%; }
+
+.pad.cricket { flex: 0 0 auto; padding-top: 2px; }
+.turnbar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap);
+  padding: 2px 2px 6px;
+  overflow: hidden;
+}
+.cflash {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pad.cricket .multrow { grid-auto-columns: 1fr; }
+
+/* ── modal ─────────────────────────────────────────────────── */
+/* Modals live outside #app, which is a full-viewport block, so without its own
+   positioning this root sits below the fold and is clipped by body's
+   overflow:hidden. A fixed child is only saved from that if the browser both
+   understands `inset` (Safari 14.1+) and correctly escapes fixed positioning
+   out of an overflow:hidden ancestor -- a long-standing WebKit weak spot.
+   Anchor the root to the viewport itself, with longhand offsets as well as the
+   shorthand, so a backdrop lands correctly whichever way it gets resolved. */
+#modal-root {
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;   /* must never swallow taps meant for the app */
+}
+#modal-root:empty { display: none; }
+
+.backdrop {
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: 0;
+  inset: 0;
+  z-index: 50;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(4, 7, 11, .74);
+  animation: fade .14s ease-out;
+}
+@keyframes fade { from { opacity: 0; } }
+.modal {
+  width: 100%;
+  max-width: 380px;
+  max-height: 88vh;    /* vh fallback: dvh alone drops the whole rule on old browsers */
+  max-height: 88dvh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
+}
+.modal.wide { max-width: 560px; }
+.modal h2 { margin: 0 0 10px; font-size: 21px; }
+.modal h3 { margin: 16px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); }
+.modal p { margin: 6px 0; font-size: 14.5px; line-height: 1.55; color: var(--dim); }
+.modal-body:empty { display: none; }
+.win-legs { font-size: 16px !important; font-weight: 700; color: var(--txt) !important; }
+.win-stat b { color: var(--amber); }
+.modal-actions { display: flex; flex-wrap: wrap; gap: var(--gap); margin-top: 16px; }
+.modal-actions .btn { flex: 1 1 auto; }
+.text-input {
+  width: 100%;
+  min-height: 54px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--txt);
+  font: inherit;
+  font-size: 18px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.text-input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+@media (max-height: 820px) {
+  /* The active player is already named and highlighted in the card strip. */
+  .focus-name { display: none; }
+  .focus { gap: 6px; padding-bottom: 4px; }
+  .focus-score { font-size: 54px; font-size: clamp(34px, 8.5vh, 132px); font-size: clamp(34px, 8.5dvh, 132px); }
+  .checkout { min-height: 0; padding: 5px 8px; }
+  .pc-meta { display: none; }
+  .players { padding: 6px 8px; }
+  .turnzone { padding-bottom: 6px; }
+  /* Give the number grid back what the fixed rows were holding. */
+  .multrow .key { min-height: 44px; }
+  .slangrow .key { min-height: 48px; }
+  .botrow .key { min-height: 48px; }
+  .pad.total .quickrow .key { min-height: 44px; }
+}
+
+/* Very short: keep the out, drop its trimmings, protect the key size. */
+@media (max-height: 700px) {
+  .co-label, .co-alt { display: none; }
+  .co-dart { font-size: 15px; padding: 2px 8px; }
+  .checkout { padding: 4px 8px; }
+  .focus-score { font-size: 44px; font-size: clamp(30px, 7.5vh, 132px); font-size: clamp(30px, 7.5dvh, 132px); }
+  .players { padding: 4px 8px; }
+  .pc-score { font-size: 21px; }
+}
+
+@media (min-height: 900px) {
+  .focus-score { font-size: 96px; font-size: clamp(34px, 11vh, 150px); font-size: clamp(34px, 11dvh, 150px); }
+}
+
+/* ── landscape: keypad beside the score ────────────────────── */
+/* Landscape is wide and short, so stacking wastes the width and starves the
+   keypad of height. Split into two columns instead: everything you read on
+   the left, everything you tap on the right. The ID beats .screen.active's
+   display:flex, and the areas let three separate siblings share one column. */
+@media (orientation: landscape) {
+  #screen-x01.active {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto 1fr auto;
+    grid-template-areas:
+      "top     top"
+      "players pad"
+      "focus   pad"
+      "turn    pad";
+    column-gap: 4px;
+  }
+  #screen-x01 .topbar   { grid-area: top; }
+  #screen-x01 .players  { grid-area: players; }
+  #screen-x01 .focus    { grid-area: focus; min-height: 0; }
+  #screen-x01 .turnzone { grid-area: turn; }
+  #screen-x01 .pad      { grid-area: pad; min-height: min-content; padding-top: 6px; }
+  #screen-x01 .focus    { min-height: 0; }
+
+  /* The score column is full height now, so the number can breathe again --
+     and this is the thing you read from the oche, so let it fill the space. */
+  #screen-x01 .focus-score { font-size: 130px; font-size: clamp(44px, 26vh, 200px); }
+  #screen-x01 .focus-name { display: block; font-size: 13px; }
+  #screen-x01 .players { grid-auto-columns: minmax(0, 1fr); overflow-x: auto; }
+}
+
+/* Short landscape still needs the trims, side-by-side or not. */
+@media (orientation: landscape) and (max-height: 620px) {
+  #screen-x01 .focus-score { font-size: 68px; font-size: clamp(36px, 16vh, 92px); }
+  #screen-x01 .focus-name { display: none; }
+  .checkout { min-height: 0; padding: 5px 8px; }
+  .players { padding: 5px 8px; }
+  .pc-score { font-size: 22px; font-size: clamp(20px, 6vh, 28px); }
+}
+
+/* ── toast ─────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  left: 50%;
+  top: 6px;                 /* over the topbar metadata, covering nothing that matters */
+  z-index: 60;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: var(--panel2);
+  border: 1px solid var(--accent);
+  color: var(--txt);
+  font-size: 14px;
+  font-weight: 700;
+  pointer-events: none;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .5);
+  animation: toast-in .16s ease-out;
+}
+.toast.out { opacity: 0; transition: opacity .35s ease-in; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, -8px); } }
+
+/* ── flexbox gap fallback (Safari < 14.1) ──────────────────── */
+/* Set by App.detectFlexGap(). Grid containers are unaffected -- grid gap has
+   been supported far longer -- so only flex rows need margins here. */
+.no-flexgap .pad > * + * { margin-top: var(--gap); }
+.no-flexgap .numgrid > * + * { margin-top: var(--gap); }
+.no-flexgap .numrow > * + * { margin-left: var(--gap); }
+.no-flexgap .focus > * + * { margin-top: 10px; }
+.no-flexgap .turnrow > * + * { margin-left: var(--gap); }
+.no-flexgap .turnbar > * + * { margin-left: var(--gap); }
+.no-flexgap .player-list > * + * { margin-top: var(--gap); }
+.no-flexgap .prow > * + * { margin-left: 2px; }
+.no-flexgap .roster > * + * { margin-top: 4px; }
+.no-flexgap .rrow-wrap > * + * { margin-left: 2px; }
+.no-flexgap .rrow > * + * { margin-left: 8px; }
+.no-flexgap .modal-actions > * + * { margin-left: var(--gap); }
+.no-flexgap .seg > * + * { margin-left: var(--gap); }
+.no-flexgap .topbar > * + * { margin-left: 8px; }
+.no-flexgap .co-main > * + * { margin-left: var(--gap); }
+
+/* ── ?debug readout ────────────────────────────────────────── */
+#debug-readout {
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 999;
+  max-width: 100%;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, .86);
+  border: 1px solid var(--accent);
+  color: #2ee27f;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  pointer-events: none;
+  white-space: nowrap;
+}

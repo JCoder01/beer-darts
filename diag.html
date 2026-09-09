@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Beer Darts — device check</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0f14; color: #eaf0f7;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  /* Deliberately mirrors the real app's structure so the checks below are
+     measuring the same conditions the app actually runs under. */
+  #app { height: 100vh; height: 100dvh; }
+  #modal-root { }            /* left unstyled on purpose: this is the suspect setup */
+  .wrap { height: 100%; overflow-y: auto; padding: 16px; box-sizing: border-box; }
+  h1 { font-size: 19px; margin: 0 0 4px; color: #2ee27f; }
+  p.sub { margin: 0 0 16px; font-size: 13px; color: #8ba0b8; }
+  .row { display: flex; gap: 10px; padding: 10px 12px; border: 1px solid #26313f;
+    border-radius: 10px; margin-bottom: 6px; background: #151c26; align-items: flex-start; }
+  .k { flex: 1; font-size: 13.5px; }
+  .v { font-weight: 800; font-size: 13.5px; white-space: nowrap; }
+  .ok { color: #2ee27f; } .bad { color: #ff5f5f; } .info { color: #ffc94d; }
+  .note { font-size: 12px; color: #8ba0b8; margin-top: 4px; line-height: 1.45; }
+  #verdict { margin: 14px 0; padding: 14px; border-radius: 12px; font-size: 15px;
+    font-weight: 700; line-height: 1.5; }
+  .v-ok { background: #13251b; border: 1px solid #2ee27f; }
+  .v-bad { background: #351313; border: 1px solid #ff5f5f; }
+  code { font-size: 12px; color: #ffc94d; word-break: break-all; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="wrap">
+    <h1>Beer Darts — device check</h1>
+    <p class="sub">Runs the exact checks behind the modal bug, on this device.</p>
+    <div id="verdict"></div>
+    <div id="out"></div>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+
+<script>
+(function () {
+  var out = document.getElementById('out');
+  function row(k, v, cls, note) {
+    out.insertAdjacentHTML('beforeend',
+      '<div class="row"><div class="k">' + k +
+      (note ? '<div class="note">' + note + '</div>' : '') +
+      '</div><div class="v ' + (cls || '') + '">' + v + '</div></div>');
+  }
+
+  var sup = function (prop, val) {
+    return !!(window.CSS && CSS.supports && CSS.supports(prop, val));
+  };
+  var supportsInset  = sup('inset', '0');
+  var supportsDvh    = sup('height', '100dvh');
+  var supportsClamp  = sup('font-size', 'clamp(10px, 2vh, 20px)');
+  var supportsAspect = sup('aspect-ratio', '1');
+
+  /* The cut-off keypad in one number: on iOS, 100vh is the toolbar-HIDDEN
+     height, so it exceeds what you can actually see. */
+  var probeVh = document.createElement('div');
+  probeVh.style.cssText = 'position:absolute;top:0;left:0;width:1px;height:100vh;visibility:hidden;';
+  document.body.appendChild(probeVh);
+  var vh100 = Math.round(probeVh.getBoundingClientRect().height);
+  document.body.removeChild(probeVh);
+  var hiddenBelowFold = vh100 - window.innerHeight;
+
+  /* Flexbox gap (Safari 14.1+); grid gap is much older. */
+  var gp = document.createElement('div');
+  gp.style.cssText = 'position:absolute;visibility:hidden;display:flex;gap:20px;';
+  gp.innerHTML = '<i style="width:10px"></i><i style="width:10px"></i>';
+  document.body.appendChild(gp);
+  var flexGapOk = gp.getBoundingClientRect().width >= 39;
+  document.body.removeChild(gp);
+
+  /* The heart of it: build a backdrop exactly as the app does, inside the
+     unstyled #modal-root that sits after a full-viewport #app, and measure
+     where it actually lands. */
+  var root = document.getElementById('modal-root');
+  var probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.01);';
+  root.appendChild(probe);
+  var pr = probe.getBoundingClientRect();
+  var vw = window.innerWidth, vh = window.innerHeight;
+  var landsCorrectly = Math.abs(pr.top) <= 2 && Math.abs(pr.left) <= 2 &&
+                       Math.abs(pr.width - vw) <= 2 && Math.abs(pr.height - vh) <= 2;
+  root.removeChild(probe);
+
+  /* Same probe, but with longhand offsets instead of the `inset` shorthand. */
+  var probe2 = document.createElement('div');
+  probe2.style.cssText = 'position:fixed;top:0;right:0;bottom:0;left:0;z-index:50;background:rgba(0,0,0,.01);';
+  root.appendChild(probe2);
+  var pr2 = probe2.getBoundingClientRect();
+  var longhandOk = Math.abs(pr2.top) <= 2 && Math.abs(pr2.width - vw) <= 2 && Math.abs(pr2.height - vh) <= 2;
+  root.removeChild(probe2);
+
+  row('Viewport (innerHeight)', vw + ' &times; ' + vh, 'info');
+  row('What <code>100vh</code> actually measures', vh100 + 'px',
+      hiddenBelowFold > 4 ? 'info' : 'ok',
+      hiddenBelowFold > 4
+        ? '<b>' + hiddenBelowFold + 'px taller than the screen</b> — the toolbar. This is ' +
+          'normal for iOS and it changes with orientation, which is why no fixed CSS ' +
+          'value works. This page keeps the old 100vh setup on purpose so it can ' +
+          'measure it; the app itself no longer uses it.'
+        : 'Matches the visible area.');
+  row('Height the app will actually use', vh + 'px', 'ok',
+      'Measured from <code>window.innerHeight</code> and re-measured on rotate, so it ' +
+      'tracks the toolbar instead of overshooting by ' + hiddenBelowFold + 'px.');
+  row('Supports <code>clamp()</code>', supportsClamp ? 'yes' : 'NO',
+      supportsClamp ? 'ok' : 'bad',
+      supportsClamp ? '' : 'Needs Safari 13.1+. Without it every font-size using it is dropped.');
+  row('Supports <code>aspect-ratio</code>', supportsAspect ? 'yes' : 'NO',
+      supportsAspect ? 'ok' : 'bad',
+      supportsAspect ? '' : 'Needs Safari 15+. Cricket marks rely on it.');
+  row('Supports flexbox <code>gap</code>', flexGapOk ? 'yes' : 'NO',
+      flexGapOk ? 'ok' : 'bad',
+      flexGapOk ? '' : 'Needs Safari 14.1+. Spacing collapses in flex rows.');
+  row('Device pixel ratio', (window.devicePixelRatio || 1), 'info');
+  row('Supports <code>inset</code> shorthand', supportsInset ? 'yes' : 'NO',
+      supportsInset ? 'ok' : 'bad',
+      supportsInset ? '' : 'Needs Safari 14.1+. Without it the old backdrop rule collapsed.');
+  row('Supports <code>dvh</code> units', supportsDvh ? 'yes' : 'NO',
+      supportsDvh ? 'ok' : 'bad',
+      supportsDvh ? '' : 'Needs Safari 15.4+. Height caps fall back to vh.');
+  row('Fixed + <code>inset:0</code> in unstyled #modal-root lands on screen',
+      landsCorrectly ? 'yes' : 'NO', landsCorrectly ? 'ok' : 'bad',
+      'Measured ' + Math.round(pr.width) + '&times;' + Math.round(pr.height) +
+      ' at top ' + Math.round(pr.top) + ', left ' + Math.round(pr.left) +
+      '. This is the exact condition the old modal relied on.');
+  row('Fixed + longhand offsets lands on screen',
+      longhandOk ? 'yes' : 'NO', longhandOk ? 'ok' : 'bad',
+      'Measured ' + Math.round(pr2.width) + '&times;' + Math.round(pr2.height) +
+      ' at top ' + Math.round(pr2.top) + '.');
+  row('Standalone / added to Home Screen',
+      (window.navigator.standalone === true) ? 'yes' : 'no', 'info',
+      'A Home Screen install keeps its own cache.');
+  row('Service worker support', ('serviceWorker' in navigator) ? 'yes' : 'no', 'info');
+  row('User agent', '<code>' + navigator.userAgent + '</code>', 'info');
+
+  var v = document.getElementById('verdict');
+  var oldBrowser = !supportsClamp || !supportsInset || !supportsDvh || !flexGapOk || !supportsAspect;
+  v.className = 'v-ok';
+  if (oldBrowser) {
+    v.innerHTML = 'Older browser detected — every gap listed above has a fallback in the ' +
+      'app, so it should render correctly. If something still looks wrong, ' +
+      '<b>say what and where</b> and send me this screen.';
+  } else {
+    v.innerHTML = 'This browser supports everything the app uses. If something looks ' +
+      'wrong it is not a compatibility gap — send me this screen and I will keep digging.';
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "Beer Darts Scoreboard",
+  "short_name": "Beer Darts",
+  "description": "Touch-first darts scoring for X01 and Cricket, with live checkout suggestions.",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0b0f14",
+  "theme_color": "#0b0f14",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
