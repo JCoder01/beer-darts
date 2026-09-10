@@ -29,11 +29,11 @@
          * to advance. Nothing in play disables a column based on either. */
         cur: 0, legStarter: 0, leg: 1,
         flash: null,
-        /* One entry per mark ever placed: { p, t, pts, to }. Powers row-level
-         * undo -- reversing a single mark needs to know exactly what points it
-         * awarded and to whom, which a state snapshot alone can't isolate. */
+        /* One entry per mark ever placed: { p, t, pts, to }. Powers the
+         * per-cell take-back -- reversing one mark needs to know exactly what
+         * points it awarded and to whom, which a state snapshot can't isolate. */
         log: [],
-        editing: false,   /* view-only: are the row-undo buttons showing? */
+        editing: null,   /* null, or the index of the column being corrected */
         over: false, winner: null, announce: null,
         history: []
       };
@@ -105,17 +105,17 @@
       Cricket.checkWin(g, i);
     },
 
-    rowLog: function (g, t) {
-      return g.log.filter(function (e) { return e.t === t; });
+    cellLog: function (g, i, t) {
+      return g.log.filter(function (e) { return e.p === i && e.t === t; });
     },
 
-    /* Take back the single most recent mark on a row -- decrement that
-     * player's marks by one and reverse exactly the points it awarded.
-     * Everything else is left where it is. */
-    undoRow: function (g, t) {
+    /* Take back one player's single most recent mark on one number --
+     * decrement their marks by one and reverse exactly the points that mark
+     * awarded. Nothing else moves. */
+    undoMark: function (g, i, t) {
       var idx = -1;
       for (var k = g.log.length - 1; k >= 0; k--) {
-        if (g.log[k].t === t) { idx = k; break; }
+        if (g.log[k].p === i && g.log[k].t === t) { idx = k; break; }
       }
       if (idx === -1) return false;
 
@@ -125,15 +125,15 @@
 
       var left = 0;
       for (var m = 0; m < g.log.length; m++) {
-        if (g.log[m].p === entry.p && g.log[m].t === t) left++;
+        if (g.log[m].p === i && g.log[m].t === t) left++;
       }
-      g.players[entry.p].marks[t] = Math.min(3, left);
+      g.players[i].marks[t] = Math.min(3, left);
 
       /* Undoing the mark that closed someone out can un-finish the game. */
       if (g.over && (g.winner == null || !Cricket.closedAll(g, g.players[g.winner]))) {
         g.over = false; g.winner = null; g.announce = null;
       }
-      g.flash = { name: g.players[entry.p].name, label: '−' + label(t), pts: 0 };
+      g.flash = { name: g.players[i].name, label: '−' + label(t), pts: 0 };
       return true;
     },
 
@@ -171,7 +171,7 @@
       });
       g.flash = null;
       g.log = [];
-      g.editing = false;
+      g.editing = null;
       g.announce = null;
       g.history = [];
     },
@@ -195,12 +195,17 @@
        * rows overflow their box there. Flex rows shrink identically on every
        * engine. Every row repeats the same column widths so they line up
        * without Grid's shared column tracks to lean on. */
-      var grid = '<div class="cgrid' + (g.editing ? ' editing' : '') + '">';
+      var edit = g.editing;   /* null, or the index of the column being corrected */
+      var editN = (edit != null && g.players[edit]) ? edit : null;
 
-      if (g.editing) {
-        /* Long-press toggled correction mode. A floating bar, not a layout
-         * row, same as the flash -- and it replaces the flash while it shows. */
-        grid += '<div class="editbar">Editing &mdash; take back a row’s last mark' +
+      var grid = '<div class="cgrid' + (editN != null ? ' editing' : '') + '">';
+
+      if (editN != null) {
+        /* Long-press on a team put that column into correction mode. A
+         * floating bar, not a layout row -- same trick as the flash, which
+         * it replaces while it shows. */
+        grid += '<div class="editbar">Editing ' + e(g.players[editN].name) +
+          ' &mdash; tap a mark to take it back' +
           '<button class="btn" data-act="editdone">Done</button></div>';
       } else {
         /* No turn to announce, so feedback is a single tap's result, shown as
@@ -218,8 +223,9 @@
        * extra player on the left. */
       var leftN = Math.ceil(n / 2);
 
-      function playerCell(p) {
-        return '<div class="ch">' +
+      function playerCell(i) {
+        var p = g.players[i];
+        return '<div class="ch' + (editN === i ? ' editing' : '') + '" data-i="' + i + '">' +
           '<div class="ch-name">' + e(p.name) + '</div>' +
           (g.variant === 'noscore'
             ? ''
@@ -229,35 +235,43 @@
       }
 
       grid += '<div class="crow">';
-      g.players.slice(0, leftN).forEach(function (p) { grid += playerCell(p); });
+      for (var h = 0; h < leftN; h++) grid += playerCell(h);
       grid += '<div class="ch corner"></div>';
-      g.players.slice(leftN).forEach(function (p) { grid += playerCell(p); });
+      for (var h2 = leftN; h2 < n; h2++) grid += playerCell(h2);
       grid += '</div>';
 
-      /* Every player's cell is live at once -- there is no "whose turn"
-       * to gate on, only whether the game itself is still going. */
+      /* Every player's cell is live at once -- there is no "whose turn" to
+       * gate on. In the edited column each cell instead becomes a take-back
+       * button for that player's last mark on that number; the other column
+       * stays normal. */
       function markCell(t, i, dead) {
         var p = g.players[i];
         var m = p.marks[t];
-        var active = !g.over;
-        return '<button class="cc' + (dead ? ' dead' : '') +
-          (m >= 3 ? ' closed' : '') + '"' +
-          (active ? ' data-act="mark" data-t="' + t + '" data-p="' + i + '"' : ' disabled') +
-          ' aria-label="' + e(p.name) + ' ' + label(t) + ', ' + m + ' marks">' +
-          '<span class="mk" data-m="' + m + '"></span></button>';
+        var editingThis = editN === i;
+        var canUndo = editingThis && Cricket.cellLog(g, i, t).length > 0;
+        var cls = 'cc' + (dead ? ' dead' : '') + (m >= 3 ? ' closed' : '') +
+          (editingThis ? ' editing' : '');
+        var attrs = ' data-t="' + t + '" data-p="' + i + '"';
+        if (editingThis) {
+          attrs += canUndo ? ' data-act="undocell"' : ' disabled';
+        } else if (!g.over) {
+          attrs += ' data-act="mark"';
+        } else {
+          attrs += ' disabled';
+        }
+        return '<button class="' + cls + '"' + attrs +
+          ' aria-label="' + e(p.name) + ' ' + label(t) + ', ' + m + ' marks' +
+          (editingThis ? ' — tap to take one back' : '') + '">' +
+          '<span class="mk" data-m="' + m + '"></span>' +
+          (editingThis ? '<span class="cc-minus">&minus;</span>' : '') +
+        '</button>';
       }
 
       g.targets.forEach(function (t) {
         var dead = Cricket.isDead(g, t);
         grid += '<div class="crow">';
         for (var i = 0; i < leftN; i++) grid += markCell(t, i, dead);
-        grid += '<div class="ct' + (dead ? ' dead' : '') + '"><span>' + label(t) + '</span>' +
-          (g.editing
-            ? '<button class="ct-undo" data-act="undorow" data-t="' + t + '"' +
-              (Cricket.rowLog(g, t).length ? '' : ' disabled') +
-              ' aria-label="Take back the last mark on ' + label(t) + '">&#8630;</button>'
-            : '') +
-          '</div>';
+        grid += '<div class="ct' + (dead ? ' dead' : '') + '">' + label(t) + '</div>';
         for (var j = leftN; j < n; j++) grid += markCell(t, j, dead);
         grid += '</div>';
       });

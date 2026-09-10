@@ -3,7 +3,7 @@
  * triggers install -> activate -> clients.claim and purges the old cache.
  * Without a bump, a device that's already installed the worker can keep
  * serving what it fetched on day one indefinitely. */
-var CACHE = 'beer-darts-v7';
+var CACHE = 'beer-darts-v8';
 var ASSETS = ['./', './index.html', './styles.css', './icon.svg', './manifest.webmanifest',
   './js/checkout.js', './js/ui.js', './js/x01.js', './js/cricket.js', './js/app.js'];
 

@@ -558,10 +558,8 @@ html.js-vh #app { height: var(--app-h); }
 
 .ct {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
   font-size: 20px;
   font-size: clamp(17px, 3vh, 24px);
   font-weight: 800;
@@ -570,20 +568,32 @@ html.js-vh #app { height: var(--app-h); }
 }
 .ct.dead { color: #44546a; text-decoration: line-through; }
 
-/* Row-undo button, shown per number only while editing. */
-.ct-undo {
-  min-height: 30px;
-  min-width: 44px;
-  padding: 0 8px;
-  border-radius: 8px;
-  background: var(--panel2);
-  border: 1px solid var(--accent);
-  color: var(--accent);
-  font-size: 16px;
-  line-height: 1;
+/* Correction mode, scoped to one team's column: that column's header and
+   every mark cell in it tint, and each cell gains a corner take-back badge. */
+.ch.editing { border-color: var(--accent); background: #16241c; }
+.ch.editing .ch-name { color: var(--accent); }
+.cc.editing {
+  position: relative;
+  border-color: var(--accent);
+  background: #13251b;
 }
-.ct-undo:active { background: #2b3a4a; }
-.ct-undo:disabled { opacity: .3; border-color: var(--line); color: var(--dim); }
+.cc.editing:disabled { opacity: .5; }
+.cc-minus {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #06210f;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 20px;
+  text-align: center;
+}
+.cc.editing:disabled .cc-minus { display: none; }
 
 /* Correction-mode banner: floats over the header row like the flash, so it
    costs no layout height. */
@@ -608,7 +618,6 @@ html.js-vh #app { height: var(--app-h); }
   animation: pop .25s ease-out;
 }
 .editbar .btn { min-height: 34px; min-width: 0; padding: 0 14px; font-size: 13px; }
-.cgrid.editing { outline: 1px solid rgba(46, 226, 127, .25); outline-offset: -1px; }
 
 .cc {
   display: flex;
@@ -833,7 +842,6 @@ html.js-vh #app { height: var(--app-h); }
    row follows it whenever a flash happens to be showing. */
 .no-flexgap .cgrid > .crow + .crow { margin-top: 3px; }
 .no-flexgap .crow > * + * { margin-left: 3px; }
-.no-flexgap .ct > * + * { margin-top: 3px; margin-left: 0; }
 .no-flexgap .editbar > * + * { margin-left: 10px; }
 .no-flexgap .player-list > * + * { margin-top: var(--gap); }
 .no-flexgap .prow > * + * { margin-left: 2px; }

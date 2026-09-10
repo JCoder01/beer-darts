@@ -87,9 +87,11 @@ bullseye, same as any other number now that there is nothing to select
 beforehand. The number column sits between the players rather than off to one
 side, so every column is right next to it.
 
-**Press and hold the grid** to reveal a row-undo button on each number. Tapping
-one takes back that row's last mark and reverses exactly the points it earned,
-leaving everything else where it is. Long-press again, or tap Done, to leave.
+**Press and hold a team** — its column or its name — to correct just that team.
+Its marks turn into take-back buttons; tapping one removes its last mark and
+reverses exactly the points it earned, leaving everything else where it is. The
+other team stays live the whole time. Long-press that team again, or tap Done,
+to leave.
 
 ## Touch details
 

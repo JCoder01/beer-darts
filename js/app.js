@@ -151,9 +151,9 @@
       cricket.addEventListener('click', App.onCricketClick);
       document.addEventListener('keydown', App.onKey);
 
-      /* Press-and-hold: edit a score in X01, toggle the row-undo buttons in
-       * Cricket. Bound on both screens; touch and mouse, mouse guarded
-       * against the synthetic events iOS fires after a real touch. */
+      /* Press-and-hold: edit a score in X01, toggle a team's take-back
+       * controls in Cricket. Bound on both screens; touch and mouse, mouse
+       * guarded against the synthetic events iOS fires after a real touch. */
       [x01, cricket].forEach(function (el) {
         el.addEventListener('touchstart', App.lpStart, { passive: true });
         el.addEventListener('touchmove', App.lpMove, { passive: true });
@@ -581,8 +581,8 @@
       if (act === 'undo') return App.undo();
       /* Corrections stay reachable after the game ends -- undoing the
        * closing mark is exactly when you'd want them. */
-      if (act === 'editdone') { g.editing = false; return App.render(); }
-      if (act === 'undorow') { Cricket.undoRow(g, +b.dataset.t); return App.render(); }
+      if (act === 'editdone') { g.editing = null; return App.render(); }
+      if (act === 'undocell') { Cricket.undoMark(g, +b.dataset.p, +b.dataset.t); return App.render(); }
       if (g.over) return;
 
       if (act === 'mark') { Cricket.throwMark(g, +b.dataset.p, +b.dataset.t); return App.render(); }
@@ -639,8 +639,14 @@
         if (target.closest('.focus-score')) return App.editScore(g.cur);
         return;
       }
-      if (g.type === 'cricket' && target.closest('.cgrid')) {
-        g.editing = !g.editing;
+      if (g.type === 'cricket') {
+        /* Which team's column was held? A mark cell carries data-p, a header
+         * cell data-i; the number labels and corner carry neither. */
+        var cell = target.closest('.cc[data-p]');
+        var head = target.closest('.ch[data-i]');
+        var i = cell ? +cell.dataset.p : head ? +head.dataset.i : null;
+        if (i == null) return;
+        g.editing = (g.editing === i) ? null : i;   /* same column toggles off */
         App.render();
       }
     },
@@ -811,9 +817,10 @@
           'times; a treble plus two singles on the same number is five taps. Three marks ' +
           'close a number; extra marks score while an opponent still has it open. Bull is ' +
           'one mark for the outer ring, two for the bullseye.</p>' +
-          '<p><b>Press and hold the grid</b> to show a row-undo button on each number; tap ' +
-          'one to take back that row\'s last mark and its points. Long-press again, or tap ' +
-          'Done, to leave.</p>' +
+          '<p><b>Press and hold a team</b> — its column or its name — to correct it. That ' +
+          'team\'s marks turn into take-back buttons; tap one to remove its last mark and ' +
+          'reverse exactly the points it earned. The other team stays live the whole time. ' +
+          'Long-press that team again, or tap Done, to leave.</p>' +
           '<h3>Anywhere</h3>' +
           '<p>The arrow in the top right undoes a dart at a time. Add this page to your home ' +
           'screen to run it fullscreen and offline.</p>'
