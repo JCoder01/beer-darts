@@ -25,6 +25,7 @@ html, body {
   overscroll-behavior: none;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;   /* no iOS long-press menu -- long-press is a control here */
   -webkit-text-size-adjust: 100%;
 }
 
@@ -557,8 +558,10 @@ html.js-vh #app { height: var(--app-h); }
 
 .ct {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 3px;
   font-size: 20px;
   font-size: clamp(17px, 3vh, 24px);
   font-weight: 800;
@@ -566,6 +569,46 @@ html.js-vh #app { height: var(--app-h); }
   letter-spacing: .02em;
 }
 .ct.dead { color: #44546a; text-decoration: line-through; }
+
+/* Row-undo button, shown per number only while editing. */
+.ct-undo {
+  min-height: 30px;
+  min-width: 44px;
+  padding: 0 8px;
+  border-radius: 8px;
+  background: var(--panel2);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 16px;
+  line-height: 1;
+}
+.ct-undo:active { background: #2b3a4a; }
+.ct-undo:disabled { opacity: .3; border-color: var(--line); color: var(--dim); }
+
+/* Correction-mode banner: floats over the header row like the flash, so it
+   costs no layout height. */
+.editbar {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 12px);
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: var(--panel2);
+  border: 1px solid var(--accent);
+  color: var(--txt);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  animation: pop .25s ease-out;
+}
+.editbar .btn { min-height: 34px; min-width: 0; padding: 0 14px; font-size: 13px; }
+.cgrid.editing { outline: 1px solid rgba(46, 226, 127, .25); outline-offset: -1px; }
 
 .cc {
   display: flex;
@@ -676,6 +719,7 @@ html.js-vh #app { height: var(--app-h); }
   font-size: 18px;
   user-select: text;
   -webkit-user-select: text;
+  -webkit-touch-callout: default;   /* re-enable paste into the score prompt */
 }
 .text-input:focus { outline: 2px solid var(--accent); outline-offset: -2px; }
 
@@ -789,6 +833,8 @@ html.js-vh #app { height: var(--app-h); }
    row follows it whenever a flash happens to be showing. */
 .no-flexgap .cgrid > .crow + .crow { margin-top: 3px; }
 .no-flexgap .crow > * + * { margin-left: 3px; }
+.no-flexgap .ct > * + * { margin-top: 3px; margin-left: 0; }
+.no-flexgap .editbar > * + * { margin-left: 10px; }
 .no-flexgap .player-list > * + * { margin-top: var(--gap); }
 .no-flexgap .prow > * + * { margin-left: 2px; }
 .no-flexgap .roster > * + * { margin-top: 4px; }

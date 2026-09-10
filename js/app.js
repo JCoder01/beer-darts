@@ -147,8 +147,21 @@
       x01.addEventListener('click', App.onX01Click);
       x01.addEventListener('touchstart', App.onTouchStart, { passive: true });
       x01.addEventListener('touchend', App.onTouchEnd, { passive: false });
-      document.getElementById('screen-cricket').addEventListener('click', App.onCricketClick);
+      var cricket = document.getElementById('screen-cricket');
+      cricket.addEventListener('click', App.onCricketClick);
       document.addEventListener('keydown', App.onKey);
+
+      /* Press-and-hold: edit a score in X01, toggle the row-undo buttons in
+       * Cricket. Bound on both screens; touch and mouse, mouse guarded
+       * against the synthetic events iOS fires after a real touch. */
+      [x01, cricket].forEach(function (el) {
+        el.addEventListener('touchstart', App.lpStart, { passive: true });
+        el.addEventListener('touchmove', App.lpMove, { passive: true });
+        el.addEventListener('touchend', App.lpCancel);
+        el.addEventListener('mousedown', App.lpStart);
+        el.addEventListener('mousemove', App.lpMove);
+        el.addEventListener('mouseup', App.lpCancel);
+      });
 
       /* iOS Safari's overflow:hidden does not reliably stop the page
        * rubber-banding under a drag, even with overscroll-behavior set (its
@@ -558,6 +571,7 @@
 
     /* Cricket input -------------------------------------------- */
     onCricketClick: function (ev) {
+      if (App.suppressClick) { App.suppressClick = false; return; }
       var b = ev.target.closest('[data-act]');
       if (!b || b.disabled) return;
       var g = App.game, act = b.dataset.act;
@@ -565,9 +579,94 @@
 
       if (act === 'menu') return App.menu();
       if (act === 'undo') return App.undo();
+      /* Corrections stay reachable after the game ends -- undoing the
+       * closing mark is exactly when you'd want them. */
+      if (act === 'editdone') { g.editing = false; return App.render(); }
+      if (act === 'undorow') { Cricket.undoRow(g, +b.dataset.t); return App.render(); }
       if (g.over) return;
 
       if (act === 'mark') { Cricket.throwMark(g, +b.dataset.p, +b.dataset.t); return App.render(); }
+    },
+
+    /* press-and-hold ------------------------------------------- */
+    LP_MS: 500,
+    LP_MOVE: 12,
+
+    lpStart: function (e) {
+      var pt;
+      if (e.type === 'mousedown') {
+        if (e.button !== 0 || Date.now() - (App.lastTouch || 0) < 700) return;
+        pt = e;
+      } else {
+        App.lastTouch = Date.now();
+        if (e.touches.length !== 1) return;
+        pt = e.touches[0];
+      }
+      if (!App.game || document.querySelector('.backdrop')) return;
+      clearTimeout(App.lpTimer);
+      App.lp = { x: pt.clientX, y: pt.clientY, target: e.target, fired: false };
+      App.lpTimer = setTimeout(function () {
+        if (!App.lp) return;
+        App.lp.fired = true;
+        UI.buzz(18);
+        App.onLongPress(App.lp.target);
+      }, App.LP_MS);
+    },
+
+    lpMove: function (e) {
+      if (!App.lp) return;
+      var pt = e.touches ? e.touches[0] : e;
+      if (Math.abs(pt.clientX - App.lp.x) > App.LP_MOVE ||
+          Math.abs(pt.clientY - App.lp.y) > App.LP_MOVE) {
+        clearTimeout(App.lpTimer);
+        App.lp = null;
+      }
+    },
+
+    lpCancel: function () {
+      clearTimeout(App.lpTimer);
+      if (App.lp && App.lp.fired) App.suppressClick = true;   /* not also a tap */
+      App.lp = null;
+    },
+
+    onLongPress: function (target) {
+      var g = App.game;
+      if (!g || !target || !target.closest) return;
+
+      if (g.type === 'x01') {
+        var card = target.closest('.pcard');
+        if (card) return App.editScore(+card.dataset.i);
+        if (target.closest('.focus-score')) return App.editScore(g.cur);
+        return;
+      }
+      if (g.type === 'cricket' && target.closest('.cgrid')) {
+        g.editing = !g.editing;
+        App.render();
+      }
+    },
+
+    editScore: function (i) {
+      var g = App.game;
+      if (!g || g.type !== 'x01') return;
+      var p = g.players[i];
+      UI.prompt('Score for ' + p.name, String(p.score), '0–' + g.start,
+        { numeric: true, min: 0, max: g.start }
+      ).then(function (val) {
+        if (val === null) return;
+        var n = parseInt(val, 10);
+        if (!/^\d+$/.test(val) || isNaN(n) || n < 0 || n > g.start) {
+          return UI.modal({
+            title: 'Out of range',
+            html: '<p>Pick a whole number from 0 to ' + g.start + '.</p>'
+          }).then(function () { App.editScore(i); });
+        }
+        X01.snapshot(g);
+        p.score = n;
+        if (n < g.start) p.opened = true;   /* they've clearly scored, so double-in is done */
+        if (i === g.cur) g.turn = { darts: [], start: n };   /* the in-progress turn's baseline moved */
+        g.flash = null;
+        App.render();
+      });
     },
 
     ENTRY_NAME: { darts: 'Dart by dart', total: '3-dart total' },
@@ -704,12 +803,17 @@
           'so busts and checkouts still work normally.</p>' +
           '<p>Busts revert the whole turn. With double out, leaving 1 is a bust, and only a double ' +
           'finishes. Switch entry mode any time from the menu.</p>' +
+          '<p><b>Press and hold a score</b> — the big one or a player card — to type in a ' +
+          'correction directly, instead of undoing dart by dart.</p>' +
           '<h3>Cricket</h3>' +
           '<p>There are no turns — either player\'s column is live at all times, so mark ' +
           'whoever\'s dart just landed. One tap is one mark. Hit a treble by tapping three ' +
           'times; a treble plus two singles on the same number is five taps. Three marks ' +
           'close a number; extra marks score while an opponent still has it open. Bull is ' +
           'one mark for the outer ring, two for the bullseye.</p>' +
+          '<p><b>Press and hold the grid</b> to show a row-undo button on each number; tap ' +
+          'one to take back that row\'s last mark and its points. Long-press again, or tap ' +
+          'Done, to leave.</p>' +
           '<h3>Anywhere</h3>' +
           '<p>The arrow in the top right undoes a dart at a time. Add this page to your home ' +
           'screen to run it fullscreen and offline.</p>'

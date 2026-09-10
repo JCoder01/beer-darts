@@ -47,7 +47,9 @@ common 20-20-1. The two scoring ones grey out once a turn is under way, since
 they need all three darts.
 
 Busts revert the whole turn: going below zero, leaving 1, or reaching zero without
-a legal finishing dart. Undo steps back one dart at a time.
+a legal finishing dart. Undo steps back one dart at a time; to fix a score from
+further back, **press and hold it** — the big number or a player card — and type
+in the correction.
 
 ### Checkouts
 
@@ -84,6 +86,10 @@ everybody is struck through. Bull is one mark for the outer ring, two for the
 bullseye, same as any other number now that there is nothing to select
 beforehand. The number column sits between the players rather than off to one
 side, so every column is right next to it.
+
+**Press and hold the grid** to reveal a row-undo button on each number. Tapping
+one takes back that row's last mark and reverses exactly the points it earned,
+leaving everything else where it is. Long-press again, or tap Done, to leave.
 
 ## Touch details
 

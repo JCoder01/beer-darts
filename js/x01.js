@@ -186,7 +186,7 @@
 
       var cards = g.players.map(function (pl, i) {
         var a = X01.avg(pl);
-        return '<div class="pcard' + (i === g.cur ? ' on' : '') + '">' +
+        return '<div class="pcard' + (i === g.cur ? ' on' : '') + '" data-i="' + i + '">' +
           '<div class="pc-top"><span class="pc-name">' + e(pl.name) + '</span>' +
             (g.legsToWin > 1 ? '<span class="pc-legs">' + pl.legs + '</span>' : '') + '</div>' +
           '<div class="pc-score">' + pl.score + '</div>' +
