@@ -75,10 +75,15 @@ and the maximum finishes come out right: 170 double out, 180 master and straight
   that number. Lowest score wins.
 - **No score** — first to close everything.
 
-Pick a multiplier, then tap the number in the highlighted column: one tap is one
-dart. Marks render in the usual `/`, `X`, ringed-`X` notation, and a number closed
-by everybody is struck through. Bull is one mark for the outer ring, two for the
-bullseye (there is no treble bull, so `TREBLE` on the bull registers two).
+There are no turns. Either player's column is live at all times, so mark
+whoever's dart just landed — no hand-off, no waiting. One tap is one mark, no
+multiplier to pick first. A treble is three taps on the same number — "treble
+20, 20, 20" (a treble plus two singles) is five taps on 20 in a row. Marks
+render in the usual `/`, `X`, ringed-`X` notation, and a number closed by
+everybody is struck through. Bull is one mark for the outer ring, two for the
+bullseye, same as any other number now that there is nothing to select
+beforehand. The number column sits between the players rather than off to one
+side, so every column is right next to it.
 
 ## Touch details
 

@@ -23,9 +23,12 @@
           targets.forEach(function (t) { marks[t] = 0; });
           return { name: n, marks: marks, score: 0, legs: 0 };
         }),
+        /* cur/legStarter are bookkeeping only now, not a turn gate: cur is
+         * whoever was last marked (used to break a simultaneous-win tie in
+         * their favour), legStarter just rotates so nextLeg has something
+         * to advance. Nothing in play disables a column based on either. */
         cur: 0, legStarter: 0, leg: 1,
-        turn: { darts: [] },
-        mult: 1, flash: null,
+        flash: null,
         over: false, winner: null, announce: null,
         history: []
       };
@@ -50,8 +53,6 @@
     },
 
     /* rules ---------------------------------------------------- */
-    dartsLeft: function (g) { return 3 - g.turn.darts.length; },
-
     isDead: function (g, t) {
       return g.players.every(function (p) { return p.marks[t] >= 3; });
     },
@@ -60,50 +61,47 @@
       return g.targets.every(function (t) { return p.marks[t] >= 3; });
     },
 
-    throwMark: function (g, target, mult) {
-      if (g.over || Cricket.dartsLeft(g) < 1) return;
+    /* There are no turns to manage: either player's column is tappable at
+     * any time, so `i` says who was just marked. One tap is one mark,
+     * always — a treble is three taps on the same cell, landing on the
+     * exact same marks/points a multiplier-selected tap once did, since the
+     * overflow math below only cares about the running total. */
+    throwMark: function (g, i, target) {
+      if (g.over) return;
       Cricket.snapshot(g);
-      g.flash = null;
 
-      var p = g.players[g.cur];
+      var p = g.players[i];
+      var had = p.marks[target];
+      var total = had + 1;
+      var overflow = Math.max(0, total - 3);
+      p.marks[target] = Math.min(3, total);
 
-      if (target === null) {                       /* a miss still burns a dart */
-        g.turn.darts.push({ label: 'MISS', marks: 0, pts: 0 });
-      } else {
-        if (target === 25 && mult === 3) mult = 2; /* no treble bull exists */
-
-        var had = p.marks[target];
-        var total = had + mult;
-        var overflow = Math.max(0, total - 3);
-        p.marks[target] = Math.min(3, total);
-
-        var pts = 0;
-        if (overflow > 0 && g.variant !== 'noscore') {
-          var open = g.players.some(function (o, i) {
-            return i !== g.cur && o.marks[target] < 3;
-          });
-          if (open) {
-            pts = overflow * target;
-            if (g.variant === 'cutthroat') {
-              g.players.forEach(function (o, i) {
-                if (i !== g.cur && o.marks[target] < 3) o.score += pts;
-              });
-            } else {
-              p.score += pts;
-            }
+      var pts = 0;
+      if (overflow > 0 && g.variant !== 'noscore') {
+        var open = g.players.some(function (o, j) {
+          return j !== i && o.marks[target] < 3;
+        });
+        if (open) {
+          pts = overflow * target;
+          if (g.variant === 'cutthroat') {
+            g.players.forEach(function (o, j) {
+              if (j !== i && o.marks[target] < 3) o.score += pts;
+            });
+          } else {
+            p.score += pts;
           }
         }
-        g.turn.darts.push({ label: (mult > 1 ? mult + 'x' : '') + label(target), marks: mult, pts: pts });
       }
 
-      g.mult = 1;
-      if (Cricket.checkWin(g)) return;
-      if (Cricket.dartsLeft(g) === 0) Cricket.endTurn(g);
+      g.cur = i;
+      g.flash = { name: p.name, label: label(target), pts: pts };
+      Cricket.checkWin(g, i);
     },
 
-    /* Cutthroat can hand the win to somebody else, so check everyone. */
-    checkWin: function (g) {
-      var order = [g.cur].concat(g.players.map(function (_, i) { return i; }));
+    /* Cutthroat can hand the win to somebody else, so check everyone --
+     * `actingIndex` (whoever was just marked) gets priority on a tie. */
+    checkWin: function (g, actingIndex) {
+      var order = [actingIndex].concat(g.players.map(function (_, i) { return i; }));
       for (var k = 0; k < order.length; k++) {
         var i = order[k], p = g.players[i];
         if (!Cricket.closedAll(g, p)) continue;
@@ -124,17 +122,6 @@
       return false;
     },
 
-    endTurn: function (g) {
-      var p = g.players[g.cur];
-      var marks = g.turn.darts.reduce(function (a, d) { return a + d.marks; }, 0);
-      var pts = g.turn.darts.reduce(function (a, d) { return a + d.pts; }, 0);
-      g.flash = { name: p.name, marks: marks, pts: pts };
-
-      g.cur = (g.cur + 1) % g.players.length;
-      g.turn = { darts: [] };
-      g.mult = 1;
-    },
-
     nextLeg: function (g) {
       g.leg++;
       g.legStarter = (g.legStarter + 1) % g.players.length;
@@ -143,8 +130,6 @@
         g.targets.forEach(function (t) { p.marks[t] = 0; });
         p.score = 0;
       });
-      g.turn = { darts: [] };
-      g.mult = 1;
       g.flash = null;
       g.announce = null;
       g.history = [];
@@ -164,60 +149,67 @@
             ' aria-label="Undo">&#8630;</button>' +
         '</header>';
 
-      var grid = '<div class="cgrid" style="--cols:' + n + '">';
+      /* One flex row per target, plus the header row, rather than a CSS Grid:
+       * Grid's fr-track row sizing is unreliable on pre-2020 Safari and let
+       * rows overflow their box there. Flex rows shrink identically on every
+       * engine. Every row repeats the same column widths so they line up
+       * without Grid's shared column tracks to lean on. */
+      var grid = '<div class="cgrid">';
 
-      grid += '<div class="ch corner"></div>';
-      g.players.forEach(function (p, i) {
-        grid += '<div class="ch' + (i === g.cur ? ' on' : '') + '">' +
+      /* No turn to announce, so feedback is a single tap's result, shown as
+       * a floating badge over the grid rather than a permanent status row --
+       * same pattern as X01's flash, which costs no layout space either. */
+      grid += g.flash
+        ? '<div class="flash">' + e(g.flash.name) + ': ' + g.flash.label +
+          (g.flash.pts ? ' &middot; +' + g.flash.pts : '') + '</div>'
+        : '';
+
+      /* The number column sits between two groups of players rather than
+       * off to one side, so every player's marks are right next to it. For
+       * two players that's a clean one-a-side split; odd counts put the
+       * extra player on the left. */
+      var leftN = Math.ceil(n / 2);
+
+      function playerCell(p) {
+        return '<div class="ch">' +
           '<div class="ch-name">' + e(p.name) + '</div>' +
           (g.variant === 'noscore'
             ? ''
             : '<div class="ch-score">' + p.score + '</div>') +
           (g.legsToWin > 1 ? '<div class="ch-legs">legs ' + p.legs + '</div>' : '') +
         '</div>';
-      });
+      }
+
+      grid += '<div class="crow">';
+      g.players.slice(0, leftN).forEach(function (p) { grid += playerCell(p); });
+      grid += '<div class="ch corner"></div>';
+      g.players.slice(leftN).forEach(function (p) { grid += playerCell(p); });
+      grid += '</div>';
+
+      /* Every player's cell is live at once -- there is no "whose turn"
+       * to gate on, only whether the game itself is still going. */
+      function markCell(t, i, dead) {
+        var p = g.players[i];
+        var m = p.marks[t];
+        var active = !g.over;
+        return '<button class="cc' + (dead ? ' dead' : '') +
+          (m >= 3 ? ' closed' : '') + '"' +
+          (active ? ' data-act="mark" data-t="' + t + '" data-p="' + i + '"' : ' disabled') +
+          ' aria-label="' + e(p.name) + ' ' + label(t) + ', ' + m + ' marks">' +
+          '<span class="mk" data-m="' + m + '"></span></button>';
+      }
 
       g.targets.forEach(function (t) {
         var dead = Cricket.isDead(g, t);
+        grid += '<div class="crow">';
+        for (var i = 0; i < leftN; i++) grid += markCell(t, i, dead);
         grid += '<div class="ct' + (dead ? ' dead' : '') + '">' + label(t) + '</div>';
-        g.players.forEach(function (p, i) {
-          var m = p.marks[t];
-          var active = i === g.cur && !g.over;
-          grid += '<button class="cc' + (i === g.cur ? ' on' : '') + (dead ? ' dead' : '') +
-            (m >= 3 ? ' closed' : '') + '"' +
-            (active ? ' data-act="mark" data-t="' + t + '"' : ' disabled') +
-            ' aria-label="' + e(p.name) + ' ' + label(t) + ', ' + m + ' marks">' +
-            '<span class="mk" data-m="' + m + '"></span></button>';
-        });
+        for (var j = leftN; j < n; j++) grid += markCell(t, j, dead);
+        grid += '</div>';
       });
       grid += '</div>';
 
-      var slots = '';
-      for (var i = 0; i < 3; i++) {
-        var d = g.turn.darts[i];
-        slots += '<span class="dslot sm' + (d ? ' filled' : '') + '">' +
-          (d ? e(d.label) : '&middot;') + '</span>';
-      }
-
-      var flash = g.flash
-        ? '<span class="cflash">' + e(g.flash.name) + ': ' + g.flash.marks + ' mark' +
-          (g.flash.marks === 1 ? '' : 's') + (g.flash.pts ? ' &middot; ' + g.flash.pts : '') + '</span>'
-        : '';
-
-      var m = g.mult;
-      var pad = '<div class="pad cricket">' +
-        '<div class="turnbar">' + slots + flash + '</div>' +
-        '<div class="multrow">' +
-          '<button class="key mult' + (m === 1 ? ' on' : '') + '" data-act="mult" data-v="1">SINGLE</button>' +
-          '<button class="key mult' + (m === 2 ? ' on' : '') + '" data-act="mult" data-v="2">DOUBLE</button>' +
-          '<button class="key mult' + (m === 3 ? ' on' : '') + '" data-act="mult" data-v="3">TREBLE</button>' +
-          '<button class="key alt" data-act="miss">MISS</button>' +
-          '<button class="key alt go" data-act="endturn"' +
-            (g.turn.darts.length && g.turn.darts.length < 3 ? '' : ' disabled') + '>END</button>' +
-        '</div>' +
-      '</div>';
-
-      return header + grid + pad;
+      return header + grid;
     }
   };
 

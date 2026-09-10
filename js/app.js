@@ -567,10 +567,7 @@
       if (act === 'undo') return App.undo();
       if (g.over) return;
 
-      if (act === 'mult') { g.mult = +b.dataset.v; return App.render(); }
-      if (act === 'mark') { Cricket.throwMark(g, +b.dataset.t, g.mult); return App.render(); }
-      if (act === 'miss') { Cricket.throwMark(g, null, 1); return App.render(); }
-      if (act === 'endturn') { Cricket.snapshot(g); Cricket.endTurn(g); return App.render(); }
+      if (act === 'mark') { Cricket.throwMark(g, +b.dataset.p, +b.dataset.t); return App.render(); }
     },
 
     ENTRY_NAME: { darts: 'Dart by dart', total: '3-dart total' },
@@ -708,9 +705,11 @@
           '<p>Busts revert the whole turn. With double out, leaving 1 is a bust, and only a double ' +
           'finishes. Switch entry mode any time from the menu.</p>' +
           '<h3>Cricket</h3>' +
-          '<p>Pick a multiplier, then tap the number in the highlighted column — one tap is one ' +
-          'dart. Three marks close a number; extra marks score while an opponent still has it ' +
-          'open. Bull is one mark for the outer ring, two for the bullseye.</p>' +
+          '<p>There are no turns — either player\'s column is live at all times, so mark ' +
+          'whoever\'s dart just landed. One tap is one mark. Hit a treble by tapping three ' +
+          'times; a treble plus two singles on the same number is five taps. Three marks ' +
+          'close a number; extra marks score while an opponent still has it open. Bull is ' +
+          'one mark for the outer ring, two for the bullseye.</p>' +
           '<h3>Anywhere</h3>' +
           '<p>The arrow in the top right undoes a dart at a time. Add this page to your home ' +
           'screen to run it fullscreen and offline.</p>'

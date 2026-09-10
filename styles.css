@@ -504,15 +504,32 @@ html.js-vh #app { height: var(--app-h); }
 }
 
 /* ── cricket grid ──────────────────────────────────────────── */
+/* A column of flex rows, not CSS Grid: Grid's fr-track row sizing is
+   unreliable on pre-2020 Safari (confirmed on an iPad mini 3) and let rows
+   overflow their box there. Flex rows shrink identically everywhere. Every
+   row repeats the same column widths so they still line up without Grid's
+   shared column tracks to lean on. */
 .cgrid {
+  position: relative;   /* anchors the floating .flash badge, see below */
   flex: 1 1 auto;
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(56px, 14%) repeat(var(--cols), 1fr);
-  grid-auto-rows: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 3px;
   padding: 6px;
+  overflow: hidden;   /* clip rather than spill past the screen edge */
 }
+/* No turns means no permanent status row -- .flash reuses the same floating,
+   no-layout-space badge X01 uses for its own bust/checkout feedback, just
+   centred explicitly since .cgrid (unlike .focus) isn't align-items:center. */
+.cgrid .flash { left: 50%; transform: translateX(-50%); z-index: 1; }
+.crow { flex: 1 1 0; min-height: 0; display: flex; gap: 3px; }
+/* The label column (corner / target number) now sits mid-row, between two
+   groups of players, rather than always being the first cell -- selected by
+   class rather than position. It's fixed-width; player cells on both sides
+   split the remaining width evenly, same as the old repeat(var(--cols), 1fr). */
+.crow > .ct, .crow > .ch.corner { flex: 0 0 15%; min-width: 56px; }
+.crow > .ch:not(.corner), .crow > .cc { flex: 1 1 0; min-width: 0; }
 .ch {
   display: flex;
   flex-direction: column;
@@ -524,18 +541,17 @@ html.js-vh #app { height: var(--app-h); }
   padding: 2px;
   min-width: 0;
 }
-.ch.on { border-color: var(--accent); background: #16241c; }
 .ch.corner { background: none; border: 0; }
 .ch-name {
   max-width: 100%;
-  font-size: 12.5px;
+  font-size: 15px;                       /* plain px fallback: no clamp() before Safari 13.1 */
+  font-size: clamp(14px, 2.2vh, 18px);
   font-weight: 700;
   color: var(--dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ch.on .ch-name { color: var(--accent); }
 .ch-score { font-size: 22px; font-size: clamp(19px, 3.4vh, 27px); font-weight: 800; font-variant-numeric: tabular-nums; }
 .ch-legs { font-size: 10px; color: var(--amber); }
 
@@ -561,8 +577,7 @@ html.js-vh #app { height: var(--app-h); }
   color: var(--dim);
   transition: transform .05s, background .1s;
 }
-.cc.on { background: var(--panel2); border-color: #37485c; color: var(--accent); }
-.cc.on:active { transform: scale(.93); background: #2b3a4a; }
+.cc:active { transform: scale(.93); background: #2b3a4a; }
 .cc.closed { color: var(--accent); }
 .cc.dead { opacity: .3; }
 .cc:disabled { opacity: .55; pointer-events: none; }
@@ -591,24 +606,6 @@ html.js-vh #app { height: var(--app-h); }
 .mk[data-m="2"]::before, .mk[data-m="2"]::after,
 .mk[data-m="3"]::before, .mk[data-m="3"]::after { opacity: 1; }
 .mk[data-m="3"] { border: 2.5px solid currentColor; border-radius: 50%; }
-
-.pad.cricket { flex: 0 0 auto; padding-top: 2px; }
-.turnbar {
-  display: flex;
-  align-items: center;
-  gap: var(--gap);
-  padding: 2px 2px 6px;
-  overflow: hidden;
-}
-.cflash {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.pad.cricket .multrow { grid-auto-columns: 1fr; }
 
 /* ── modal ─────────────────────────────────────────────────── */
 /* Modals live outside #app, which is a full-viewport block, so without its own
@@ -691,6 +688,8 @@ html.js-vh #app { height: var(--app-h); }
   .slangrow .key { min-height: 48px; }
   .botrow .key { min-height: 48px; }
   .pad.total .quickrow .key { min-height: 44px; }
+  .ct, .ch-score { font-size: 18px; }
+  .ch-name { font-size: 14px; }
 }
 
 /* Very short: keep the out, drop its trimmings, protect the key size. */
@@ -701,6 +700,8 @@ html.js-vh #app { height: var(--app-h); }
   .focus-score { font-size: 44px; font-size: clamp(30px, 7.5vh, 132px); font-size: clamp(30px, 7.5dvh, 132px); }
   .players { padding: 4px 8px; }
   .pc-score { font-size: 21px; }
+  .cgrid { padding: 4px; gap: 2px; }
+  .crow { gap: 2px; }
 }
 
 @media (min-height: 900px) {
@@ -777,6 +778,12 @@ html.js-vh #app { height: var(--app-h); }
 .no-flexgap .focus > * + * { margin-top: 10px; }
 .no-flexgap .turnrow > * + * { margin-left: var(--gap); }
 .no-flexgap .turnbar > * + * { margin-left: var(--gap); }
+/* .crow + .crow, not the generic * + * -- the floating .flash badge is a
+   flow sibling in the DOM even though position:absolute takes it out of
+   layout, so the generic pattern would misfire a stray margin onto whichever
+   row follows it whenever a flash happens to be showing. */
+.no-flexgap .cgrid > .crow + .crow { margin-top: 3px; }
+.no-flexgap .crow > * + * { margin-left: 3px; }
 .no-flexgap .player-list > * + * { margin-top: var(--gap); }
 .no-flexgap .prow > * + * { margin-left: 2px; }
 .no-flexgap .roster > * + * { margin-top: 4px; }
