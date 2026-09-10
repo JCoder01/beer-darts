@@ -585,9 +585,14 @@ html.js-vh #app { height: var(--app-h); }
 /* Cricket marks: / then X then a ringed X. */
 /* Height, not aspect-ratio, is the fallback: without it these empty spans
    collapse to zero and the marks disappear (Safari gained aspect-ratio in 15). */
-.mk { position: relative; width: 54%; max-width: 46px; height: 34px; }
+/* The fallback must be a fixed square, not a %-width/fixed-height box, or
+   border-radius:50% on the closed mark draws an ellipse (Safari gained
+   aspect-ratio in 15; an iPad mini 3 tops out at 12). Real cells there are
+   66px+, so 40px sits comfortably centred; modern browsers take the
+   responsive version below instead. */
+.mk { position: relative; width: 40px; height: 40px; }
 @supports (aspect-ratio: 1) {
-  .mk { height: auto; aspect-ratio: 1; }
+  .mk { width: 54%; max-width: 46px; height: auto; aspect-ratio: 1; }
 }
 .mk::before, .mk::after {
   content: "";
