@@ -501,7 +501,7 @@
 
     /* X01 input ------------------------------------------------ */
     onX01Click: function (ev) {
-      if (App.suppressClick) { App.suppressClick = false; return; }
+      if (App.clickSuppressed()) return;
       var b = ev.target.closest('[data-act]');
       if (!b || b.disabled) return;
       var g = App.game, act = b.dataset.act, v = +b.dataset.v;
@@ -571,7 +571,7 @@
 
     /* Cricket input -------------------------------------------- */
     onCricketClick: function (ev) {
-      if (App.suppressClick) { App.suppressClick = false; return; }
+      if (App.clickSuppressed()) return;
       var b = ev.target.closest('[data-act]');
       if (!b || b.disabled) return;
       var g = App.game, act = b.dataset.act;
@@ -586,6 +586,22 @@
       if (g.over) return;
 
       if (act === 'mark') { Cricket.throwMark(g, +b.dataset.p, +b.dataset.t); return App.render(); }
+    },
+
+    /* Swallow the click that a swipe or long-press may leave behind. It
+     * expires on its own: when touchend is prevented, or a held press ends
+     * without a click, none arrives, and a plain flag would eat the next
+     * real tap instead. */
+    SUPPRESS_MS: 400,
+
+    suppressClick: function () {
+      App.suppressUntil = Date.now() + App.SUPPRESS_MS;
+    },
+
+    clickSuppressed: function () {
+      if (Date.now() >= (App.suppressUntil || 0)) return false;
+      App.suppressUntil = 0;
+      return true;
     },
 
     /* press-and-hold ------------------------------------------- */
@@ -625,7 +641,7 @@
 
     lpCancel: function () {
       clearTimeout(App.lpTimer);
-      if (App.lp && App.lp.fired) App.suppressClick = true;   /* not also a tap */
+      if (App.lp && App.lp.fired) App.suppressClick();   /* not also a tap */
       App.lp = null;
     },
 
@@ -714,7 +730,7 @@
       if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5 || Date.now() - s.t > 600) return;
 
       if (e.cancelable) e.preventDefault();
-      App.suppressClick = true;                       /* the tap under the swipe is not a throw */
+      App.suppressClick();                            /* the tap under the swipe is not a throw */
       App.setEntry(g.entry === 'darts' ? 'total' : 'darts');
     },
 
