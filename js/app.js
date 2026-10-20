@@ -517,6 +517,7 @@
 
       if (act === 'menu') return App.menu();
       if (act === 'undo') return App.undo();
+      if (act === 'ledger') return App.ledger();
       if (g.over) return;
 
       if (act === 'mult') { g.mult = v; return App.render(); }
@@ -691,6 +692,7 @@
           }).then(function () { App.editScore(i); });
         }
         X01.snapshot(g);
+        (g.rounds = g.rounds || []).push({ p: i, leg: g.leg, edit: true, left: n });
         p.score = n;
         if (n < g.start) p.opened = true;   /* they've clearly scored, so double-in is done */
         if (i === g.cur) g.turn = { darts: [], start: n };   /* the in-progress turn's baseline moved */
@@ -765,11 +767,26 @@
     },
 
     /* menus ---------------------------------------------------- */
+    /* Opens scrolled to the bottom, where the latest visit is. */
+    ledger: function () {
+      UI.modal({
+        title: 'Ledger',
+        wide: true,
+        html: X01.ledgerHtml(App.game),
+        actions: [{ label: 'Close', value: null, kind: 'primary' }],
+        onOpen: function (wrap) {
+          var m = wrap.querySelector('.modal');
+          m.scrollTop = m.scrollHeight;
+        }
+      });
+    },
+
     menu: function () {
       var g = App.game;
       var actions = [{ label: 'Resume', value: null, kind: 'primary' }];
       if (g.history.length) actions.push({ label: 'Undo last dart', value: 'undo' });
       if (g.type === 'x01') {
+        actions.push({ label: 'Ledger', value: 'ledger' });
         actions.push({
           label: g.entry === 'darts' ? 'Switch to 3-dart total' : 'Switch to dart by dart',
           value: 'entry'
@@ -781,6 +798,7 @@
 
       UI.modal({ title: 'Menu', actions: actions }).then(function (v) {
         if (v === 'undo') return App.undo();
+        if (v === 'ledger') return App.ledger();
         if (v === 'entry') return App.setEntry(g.entry === 'darts' ? 'total' : 'darts');
         if (v === 'restart') {
           return UI.modal({
@@ -794,6 +812,7 @@
             g.leg--;                                   /* a restart is not a new leg */
             g.legStarter = (g.legStarter - 1 + g.players.length) % g.players.length;
             g.cur = g.legStarter;
+            if (g.rounds) g.rounds = g.rounds.filter(function (r) { return r.leg !== g.leg; });
             App.render();
           });
         }
@@ -836,6 +855,8 @@
           '<p><b>Diddle in the Middle</b> — before the first leg, everyone throws one dart at ' +
           'the bull; tap whoever landed closest and they throw first. Skip keeps the order ' +
           'from setup. Later legs rotate the starter as usual.</p>' +
+          '<p>Each player card shows that player\'s last visit beside their score. ' +
+          '<b>Tap a card</b>, or Ledger at the top, to see every round of the game so far.</p>' +
           '<p><b>Press and hold a score</b> — the big one or a player card — to type in a ' +
           'correction directly, instead of undoing dart by dart.</p>' +
           '<h3>Cricket</h3>' +

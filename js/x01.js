@@ -33,6 +33,7 @@
         over: false, winner: null, announce: null,
         /* Throw for the middle before the first leg; nothing to settle solo. */
         diddle: cfg.players.length > 1,
+        rounds: [],
         history: []
       };
     },
@@ -124,6 +125,18 @@
       return null;
     },
 
+    /* The ledger: one row per finished visit, kept across legs. It lives on
+     * the game, so undo snapshots roll it back along with everything else. */
+    log: function (g, row) {
+      row.p = g.cur;
+      row.leg = g.leg;
+      (g.rounds = g.rounds || []).push(row);
+    },
+
+    dartLabels: function (g) {
+      return g.entry === 'darts' ? g.turn.darts.map(function (d) { return d.label; }) : null;
+    },
+
     endTurn: function (g, bust, dartCount) {
       var p = g.players[g.cur];
       if (bust) p.score = g.turn.start;
@@ -135,6 +148,7 @@
       p.scored += scored;
       p.last = bust ? 'BUST' : scored;
       if (!bust && scored > p.best) p.best = scored;
+      X01.log(g, { scored: scored, n: thrown, bust: !!bust, left: p.score, darts: X01.dartLabels(g) });
 
       g.flash = { name: p.name, bust: !!bust, scored: scored };
 
@@ -153,6 +167,7 @@
       p.last = g.turn.start;
       if (g.turn.start > p.best) p.best = g.turn.start;
       p.legs++;
+      X01.log(g, { scored: g.turn.start, n: thrown, out: true, left: 0, darts: X01.dartLabels(g) });
 
       if (p.legs >= g.legsToWin) { g.over = true; g.winner = g.cur; }
       g.announce = { player: g.cur, over: g.over };
@@ -190,18 +205,20 @@
           '<div class="topinfo">' + g.start + ' &middot; ' + MODE_NAME[g.outMode] +
             (g.doubleIn ? ' &middot; Double in' : '') +
             (g.legsToWin > 1 ? ' &middot; Leg ' + g.leg : '') + '</div>' +
+          '<button class="btn ledger-btn" data-act="ledger">Ledger</button>' +
           '<button class="btn ghost" data-act="undo"' + (g.history.length ? '' : ' disabled') +
             ' aria-label="Undo">&#8630;</button>' +
         '</header>';
 
+      /* Tapping a card opens the ledger; holding it still edits the score. */
       var cards = g.players.map(function (pl, i) {
         var a = X01.avg(pl);
-        return '<div class="pcard' + (i === g.cur ? ' on' : '') + '" data-i="' + i + '">' +
+        return '<div class="pcard' + (i === g.cur ? ' on' : '') + '" data-i="' + i + '" data-act="ledger">' +
           '<div class="pc-top"><span class="pc-name">' + e(pl.name) + '</span>' +
             (g.legsToWin > 1 ? '<span class="pc-legs">' + pl.legs + '</span>' : '') + '</div>' +
           '<div class="pc-score">' + pl.score + '</div>' +
-          '<div class="pc-meta"><span>avg ' + (a ? a.toFixed(1) : '&ndash;') + '</span>' +
-            '<span>' + (pl.last === null ? '' : pl.last) + '</span></div>' +
+          '<div class="pc-meta">' + X01.lastPill(pl.last) +
+            '<span class="pc-avg">avg ' + (a ? a.toFixed(1) : '&ndash;') + '</span></div>' +
           (g.doubleIn && !pl.opened ? '<div class="pc-tag">needs double in</div>' : '') +
         '</div>';
       }).join('');
@@ -262,6 +279,68 @@
 
       return header + '<div class="players">' + cards + '</div>' +
         focus + turnzone + X01.pad(g);
+    },
+
+    /* The previous visit, beside the score where it can be read from the oche. */
+    lastPill: function (last) {
+      if (last === null || last === undefined) return '';
+      var cls = last === 'BUST' ? ' bust' : last >= 100 ? ' big' : '';
+      return '<span class="pc-last' + cls + '">' + (last === 'BUST' ? 'BUST' : '&minus;' + last) + '</span>';
+    },
+
+    /* Every visit so far, a table per leg: a row per round, a column per
+     * player in that leg's throwing order. */
+    ledgerHtml: function (g) {
+      var e = UI.esc, rows = g.rounds || [], n = g.players.length, html = '', leg;
+      if (!rows.length) return '<p>No rounds yet.</p>';
+
+      for (leg = 1; leg <= g.leg; leg++) {
+        var inLeg = rows.filter(function (r) { return r.leg === leg; });
+        if (!inLeg.length) continue;
+
+        var first = inLeg[0].p, order = [], i;
+        for (i = 0; i < n; i++) order.push((first + i) % n);
+        /* A correction is not a visit, so it rides on the visit before it
+         * rather than taking a round's row and pushing later visits down. */
+        var cols = order.map(function (pi) {
+          var col = [];
+          inLeg.forEach(function (r) {
+            if (r.p !== pi) return;
+            var prev = col[col.length - 1];
+            if (r.edit && prev && !prev.edit) col[col.length - 1] = Object.assign({}, prev, { fixed: r.left });
+            else col.push(r);
+          });
+          return col;
+        });
+        var depth = Math.max.apply(null, cols.map(function (c) { return c.length; }));
+
+        if (g.legsToWin > 1 || g.leg > 1) html += '<h3>Leg ' + leg + '</h3>';
+        html += '<div class="ledger-wrap"><table class="ledger"><thead><tr><th></th>' +
+          order.map(function (pi) { return '<th>' + e(g.players[pi].name) + '</th>'; }).join('') +
+          '</tr></thead><tbody>';
+
+        for (var r = 0; r < depth; r++) {
+          html += '<tr><th>' + (r + 1) + '</th>' + cols.map(function (c) {
+            var v = c[r];
+            if (!v) return '<td></td>';
+            var main = v.edit ? '&#9998;' : v.bust ? 'BUST' : v.scored;
+            var cls = v.edit ? 'edit' : v.bust ? 'bust' : v.out ? 'out' : v.scored >= 100 ? 'big' : '';
+            return '<td class="' + cls + '"><span class="lg-sc">' + main + '</span>' +
+              '<span class="lg-left">' + (v.out ? 'out' : v.left) + '</span>' +
+              (v.darts && v.darts.length ? '<span class="lg-darts">' + e(v.darts.join(' ')) + '</span>' : '') +
+              (v.fixed != null ? '<span class="lg-fix">&#9998; ' + v.fixed + '</span>' : '') +
+            '</td>';
+          }).join('') + '</tr>';
+        }
+
+        /* A per-leg average, counting only real visits, not corrections. */
+        html += '</tbody><tfoot><tr><th>avg</th>' + cols.map(function (c) {
+          var pts = 0, darts = 0;
+          c.forEach(function (v) { if (!v.edit) { pts += v.scored; darts += v.n; } });
+          return '<td>' + (darts ? (pts / darts * 3).toFixed(1) : '&ndash;') + '</td>';
+        }).join('') + '</tr></tfoot></table></div>';
+      }
+      return html;
     },
 
     /* Before the first leg: one dart each at the bull, closest throws first. */
