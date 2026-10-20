@@ -773,6 +773,17 @@ html.js-vh #app { height: var(--app-h); }
 .ledger td.bust .lg-sc { color: var(--red); font-size: 14px; }
 .ledger td.out .lg-sc, .ledger td.out .lg-left { color: var(--accent); }
 .ledger td.edit .lg-sc { color: var(--dim); font-size: 15px; }
+/* Cricket: a row per run of marks, read left to right like a scoresheet. */
+.cledger td { min-width: 0; vertical-align: middle; }
+.cledger .lg-team { text-align: left; font-weight: 700; color: var(--txt); white-space: nowrap; max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+.cledger .lg-marks { text-align: left; font-size: 15px; font-weight: 700; color: var(--txt); }
+.cledger .lg-pts { text-align: right; font-weight: 800; color: var(--amber); white-space: nowrap; }
+.cledger thead th:nth-child(2), .cledger thead th:nth-child(3) { text-align: left; }
+.cledger thead th:last-child { text-align: right; }
+.cledger tr.edit .lg-team, .cledger tr.edit .lg-marks, .cledger tr.edit .lg-pts { color: var(--dim); font-weight: 600; }
+.lg-to { font-size: 11px; font-weight: 600; color: var(--dim); }
+.lg-sum { margin-top: 8px !important; font-size: 13px !important; }
+.lg-sum b { color: var(--txt); }
 .ledger tfoot td { font-size: 13px; font-weight: 700; color: var(--dim); border-bottom: 0; }
 
 .text-input {

@@ -588,6 +588,7 @@
 
       if (act === 'menu') return App.menu();
       if (act === 'undo') return App.undo();
+      if (act === 'ledger') return App.ledger();
       /* Corrections stay reachable after the game ends -- undoing the
        * closing mark is exactly when you'd want them. */
       if (act === 'editdone') { g.editing = null; return App.render(); }
@@ -772,7 +773,7 @@
       UI.modal({
         title: 'Ledger',
         wide: true,
-        html: X01.ledgerHtml(App.game),
+        html: App.mod().ledgerHtml(App.game),
         actions: [{ label: 'Close', value: null, kind: 'primary' }],
         onOpen: function (wrap) {
           var m = wrap.querySelector('.modal');
@@ -785,8 +786,8 @@
       var g = App.game;
       var actions = [{ label: 'Resume', value: null, kind: 'primary' }];
       if (g.history.length) actions.push({ label: 'Undo last dart', value: 'undo' });
+      actions.push({ label: 'Ledger', value: 'ledger' });
       if (g.type === 'x01') {
-        actions.push({ label: 'Ledger', value: 'ledger' });
         actions.push({
           label: g.entry === 'darts' ? 'Switch to 3-dart total' : 'Switch to dart by dart',
           value: 'entry'
@@ -869,6 +870,9 @@
           'team\'s marks turn into take-back buttons; tap one to remove its last mark and ' +
           'reverse exactly the points it earned. The other team stays live the whole time. ' +
           'Long-press that team again, or tap Done, to leave.</p>' +
+          '<p><b>Tap a team\'s name</b>, or Ledger at the top, to see every mark so far. ' +
+          'Marks on one team with nobody else marked in between share a row, which is ' +
+          'usually one visit; take-backs get a row of their own.</p>' +
           '<h3>Anywhere</h3>' +
           '<p>The arrow in the top right undoes a dart at a time. Add this page to your home ' +
           'screen to run it fullscreen and offline.</p>'

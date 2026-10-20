@@ -33,6 +33,9 @@
          * per-cell take-back -- reversing one mark needs to know exactly what
          * points it awarded and to whom, which a state snapshot can't isolate. */
         log: [],
+        /* The ledger: every mark and take-back, kept across legs. Unlike
+         * `log` it is append-only -- a take-back is a row of its own. */
+        rounds: [],
         editing: null,   /* null, or the index of the column being corrected */
         over: false, winner: null, announce: null,
         history: []
@@ -100,6 +103,7 @@
       }
 
       g.log.push({ p: i, t: target, pts: pts, to: to });
+      (g.rounds = g.rounds || []).push({ p: i, t: target, pts: pts, to: to, leg: g.leg });
       g.cur = i;
       g.flash = { name: p.name, label: label(target), pts: pts };
       Cricket.checkWin(g, i);
@@ -122,6 +126,7 @@
       Cricket.snapshot(g);   /* so the top-bar undo can reverse this correction */
       var entry = g.log.splice(idx, 1)[0];
       entry.to.forEach(function (j) { g.players[j].score -= entry.pts; });
+      (g.rounds = g.rounds || []).push({ p: i, t: t, pts: entry.pts, to: entry.to, leg: g.leg, undo: true });
 
       var left = 0;
       for (var m = 0; m < g.log.length; m++) {
@@ -176,6 +181,68 @@
       g.history = [];
     },
 
+    /* ledger ---------------------------------------------------- */
+    /* There are no turns, so a row is a run of marks on one team with no
+     * other team marked in between -- which is what a visit looks like at
+     * the board. Take-backs get rows of their own. */
+    ledgerHtml: function (g) {
+      var e = UI.esc, rows = g.rounds || [], html = '', leg;
+      var scoring = g.variant !== 'noscore';
+      if (!rows.length) return '<p>No marks yet.</p>';
+
+      for (leg = 1; leg <= g.leg; leg++) {
+        var runs = [];
+        rows.forEach(function (r) {
+          if (r.leg !== leg) return;
+          var last = runs[runs.length - 1];
+          if (last && last.p === r.p && last.undo === !!r.undo) last.marks.push(r);
+          else runs.push({ p: r.p, undo: !!r.undo, marks: [r] });
+        });
+        if (!runs.length) continue;
+
+        if (g.legsToWin > 1 || g.leg > 1) html += '<h3>Leg ' + leg + '</h3>';
+        html += '<div class="ledger-wrap"><table class="ledger cledger"><thead><tr>' +
+          '<th></th><th>Team</th><th>Marks</th>' + (scoring ? '<th>Pts</th>' : '') +
+          '</tr></thead><tbody>';
+
+        var count = g.players.map(function () { return 0; });
+        runs.forEach(function (run, k) {
+          /* Same number back to back reads as one hit: 20×3 for a treble. */
+          var groups = [];
+          run.marks.forEach(function (m) {
+            var gl = groups[groups.length - 1];
+            if (gl && gl.t === m.t) gl.n++;
+            else groups.push({ t: m.t, n: 1 });
+          });
+          var marks = groups.map(function (gp) {
+            return (run.undo ? '&minus;' : '') + label(gp.t) + (gp.n > 1 ? '&times;' + gp.n : '');
+          }).join(' &middot; ');
+
+          /* Cutthroat hands points to the others, so say whose they are. */
+          var pts = {};
+          run.marks.forEach(function (m) {
+            m.to.forEach(function (j) { pts[j] = (pts[j] || 0) + m.pts; });
+          });
+          var ptsHtml = Object.keys(pts).map(function (j) {
+            return (run.undo ? '&minus;' : '+') + pts[j] +
+              (g.variant === 'cutthroat' ? ' <span class="lg-to">' + e(g.players[j].name) + '</span>' : '');
+          }).join('<br>');
+
+          count[run.p] += run.undo ? -run.marks.length : run.marks.length;
+          html += '<tr' + (run.undo ? ' class="edit"' : '') + '><th>' + (k + 1) + '</th>' +
+            '<td class="lg-team">' + (run.undo ? '&#9998; ' : '') + e(g.players[run.p].name) + '</td>' +
+            '<td class="lg-marks">' + marks + '</td>' +
+            (scoring ? '<td class="lg-pts">' + ptsHtml + '</td>' : '') + '</tr>';
+        });
+
+        html += '</tbody></table></div>' +
+          '<p class="lg-sum">Marks: ' + g.players.map(function (p, i) {
+            return e(p.name) + ' <b>' + count[i] + '</b>';
+          }).join(' &middot; ') + '</p>';
+      }
+      return html;
+    },
+
     /* render --------------------------------------------------- */
     render: function (g) {
       var e = UI.esc;
@@ -186,6 +253,7 @@
           '<button class="btn ghost" data-act="menu" aria-label="Menu">&#9776;</button>' +
           '<div class="topinfo">Cricket &middot; ' + VARIANT_NAME[g.variant] +
             (g.legsToWin > 1 ? ' &middot; Leg ' + g.leg : '') + '</div>' +
+          '<button class="btn ledger-btn" data-act="ledger">Ledger</button>' +
           '<button class="btn ghost" data-act="undo"' + (g.history.length ? '' : ' disabled') +
             ' aria-label="Undo">&#8630;</button>' +
         '</header>';
@@ -225,7 +293,8 @@
 
       function playerCell(i) {
         var p = g.players[i];
-        return '<div class="ch' + (editN === i ? ' editing' : '') + '" data-i="' + i + '">' +
+        /* Tapping a team opens the ledger; holding it still starts a correction. */
+        return '<div class="ch' + (editN === i ? ' editing' : '') + '" data-i="' + i + '" data-act="ledger">' +
           '<div class="ch-name">' + e(p.name) + '</div>' +
           (g.variant === 'noscore'
             ? ''
