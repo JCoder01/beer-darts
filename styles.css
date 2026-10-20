@@ -790,6 +790,19 @@ html.js-vh #app { height: var(--app-h); }
 .ledger td.can-edit { cursor: pointer; border-radius: 8px; }
 .ledger td.can-edit:active { background: var(--panel2); }
 .ledger td.can-edit .lg-sc { text-decoration: underline dotted var(--dim); text-underline-offset: 3px; }
+.lg-first {
+  display: block;
+  width: max-content;
+  margin: 2px auto 0;
+  padding: 0 5px;
+  border-radius: 5px;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #06210f;
+  background: var(--accent);
+}
 .lg-mark { margin-left: 2px; font-size: 10px; color: var(--amber); }
 .lg-mk {
   padding: 2px 7px;

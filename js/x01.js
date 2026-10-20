@@ -289,7 +289,7 @@
     },
 
     /* Every visit so far, a table per leg: a row per round, a column per
-     * player in that leg's throwing order. */
+     * player in the scoreboard's order. */
     ledgerHtml: function (g) {
       var e = UI.esc, rows = g.rounds || [], n = g.players.length, html = '', leg;
       if (!rows.length) return '<p>No rounds yet.</p>';
@@ -304,11 +304,14 @@
         /* Only the leg in play can change; an earlier one may have decided a winner. */
         var editable = leg === g.leg && !g.over;
 
-        var first = inLeg[0].p, order = [], i;
-        for (i = 0; i < n; i++) order.push((first + i) % n);
-        /* A correction is not a visit, so it rides on the visit before it
-         * rather than taking a round's row and pushing later visits down. */
-        var cols = order.map(function (pi) {
+        /* Columns follow the scoreboard's order so a player stays in the same
+         * place on both; whoever started the leg is tagged instead. A
+         * correction is not a visit, so the first real one decides. */
+        var opener = inLeg.filter(function (r) { return !r.edit; })[0];
+        var first = opener ? opener.p : null;
+        /* A correction rides on the visit before it rather than taking a
+         * round's row and pushing later visits down. */
+        var cols = g.players.map(function (_, pi) {
           var col = [];
           inLeg.forEach(function (r) {
             if (r.p !== pi) return;
@@ -322,7 +325,10 @@
 
         if (g.legsToWin > 1 || g.leg > 1) html += '<h3>Leg ' + leg + '</h3>';
         html += '<div class="ledger-wrap"><table class="ledger"><thead><tr><th></th>' +
-          order.map(function (pi) { return '<th>' + e(g.players[pi].name) + '</th>'; }).join('') +
+          g.players.map(function (pl, pi) {
+            return '<th>' + e(pl.name) +
+              (pi === first && n > 1 ? '<span class="lg-first">1st</span>' : '') + '</th>';
+          }).join('') +
           '</tr></thead><tbody>';
 
         for (var r = 0; r < depth; r++) {
