@@ -29,7 +29,7 @@
         players: cfg.players.map(function (n) { return newPlayer(n, cfg.start, cfg.doubleIn); }),
         cur: 0, legStarter: 0, leg: 1,
         turn: { darts: [], start: cfg.start },
-        mult: 1, pending: '', flash: null,
+        mult: 1, pending: '', fire: 0, flash: null,
         over: false, winner: null, announce: null,
         /* Throw for the middle before the first leg; nothing to settle solo. */
         diddle: cfg.players.length > 1,
@@ -65,6 +65,31 @@
 
     /* play ----------------------------------------------------- */
     dartsLeft: function (g) { return 3 - g.turn.darts.length; },
+
+    /* 3-dart total entry: typed digits, plus any 🔥 (a treble 20 each) put
+     * in front of them, so a visit like T20 T20 1 is 🔥🔥 then 1. The visit
+     * is their sum, and nothing typed may push it past 180. */
+    pendingTotal: function (g) { return (g.fire || 0) * 60 + (+g.pending || 0); },
+    hasPending: function (g) { return g.pending !== '' || (g.fire || 0) > 0; },
+    clearPending: function (g) { g.pending = ''; g.fire = 0; },
+
+    typeDigit: function (g, d) {
+      if (g.pending.length >= 3) return;
+      var next = (g.pending + d).replace(/^0+(?=\d)/, '');
+      if ((g.fire || 0) * 60 + +next <= 180) g.pending = next;
+    },
+
+    backspace: function (g) {
+      if (g.pending) g.pending = g.pending.slice(0, -1);
+      else if (g.fire) g.fire--;
+    },
+
+    /* Returns false when the fires would not fit -- 🔥🔥 on top of 61, say. */
+    addFire: function (g, n) {
+      if ((g.fire || 0) + n > 2 || X01.pendingTotal(g) + n * 60 > 180) return false;
+      g.fire = (g.fire || 0) + n;
+      return true;
+    },
 
     checkout: function (g) {
       var p = g.players[g.cur];
@@ -115,7 +140,7 @@
       g.flash = null;
       if (total > 0) p.opened = true;   /* assume the opening double was hit */
       g.turn.darts = [{ label: String(total), value: total, scored: bust ? 0 : total }];
-      g.pending = '';
+      X01.clearPending(g);
 
       if (bust) { X01.endTurn(g, true, 3); return null; }
 
@@ -155,7 +180,7 @@
       g.cur = (g.cur + 1) % g.players.length;
       g.turn = { darts: [], start: g.players[g.cur].score };
       g.mult = 1;
-      g.pending = '';
+      X01.clearPending(g);
     },
 
     winLeg: function (g, dartCount) {
@@ -184,7 +209,7 @@
       });
       g.turn = { darts: [], start: g.start };
       g.mult = 1;
-      g.pending = '';
+      X01.clearPending(g);
       g.flash = null;
       g.announce = null;
       g.history = [];
@@ -231,8 +256,12 @@
             (d ? e(d.label) : '&middot;') + '</span>';
         }
       } else {
-        slots = '<span class="dslot wide' + (g.pending ? ' filled' : '') + '">' +
-          (g.pending || '<span class="ph">3-dart total</span>') + '</span>';
+        /* With fires in play, show the sum being built: "60 + 21 = 81". */
+        var fired = (g.fire || 0) * 60;
+        var shown = !fired ? g.pending
+          : fired + ' + ' + (g.pending ? g.pending + ' <span class="ph">=</span> ' + X01.pendingTotal(g) : '');
+        slots = '<span class="dslot wide' + (X01.hasPending(g) ? ' filled' : '') + '">' +
+          (shown || '<span class="ph">3-dart total</span>') + '</span>';
       }
 
       var turnScored = g.turn.darts.reduce(function (a, d) { return a + d.scored; }, 0);
@@ -490,34 +519,41 @@
     },
 
     /* Breakfast is 20-5-1, the classic 26. Fuck all is a scoreless visit.
-     * The value lives in aria-label only; the face of the key is the label. */
+     * The face shows the label with what it is worth underneath. */
     slangKey: function (act, name, emoji, val, disabled) {
       return '<button class="key slang" data-act="' + act + '"' +
         (disabled ? ' disabled' : '') +
         ' aria-label="' + UI.esc(name) + ', ' + val + '">' +
-        X01.chipLabel(name, emoji) + '</button>';
+        X01.chipLabel(name, emoji) + '<span class="q-pts">' + val + '</span></button>';
     },
 
     padTotal: function (g) {
-      /* Every chip earns its place with a name. 60, 120 and 180 are one, two
-       * and three treble twenties, so they burn one, two and three times. */
+      /* Every chip earns its place with a name, and shows its points. A fire
+       * is a treble twenty: one or two of them start a total that the keypad
+       * finishes (🔥🔥 then 1 is 121), while three is the whole visit. */
       var quick = [
         { v: 0, name: 'Fuck All' },
         { v: 26, name: 'Breakfast', emoji: BACON_EGGS },
         { v: 41, name: 'Fish and chips', emoji: FISH_CHIPS },
         { v: 45, name: "Bag o' nuts", emoji: NUTS },
-        { v: 60, name: 'Sixty', emoji: FIRE },
+        { fire: 1, name: 'Treble twenty', emoji: FIRE },
         { v: 100, name: 'Ton', emoji: TON },
-        { v: 120, name: 'One twenty', emoji: FIRE + FIRE },
+        { fire: 2, name: 'Two treble twenties', emoji: FIRE + FIRE },
         { v: 180, name: 'Maximum', emoji: FIRE + FIRE + FIRE }
       ];
+      var total = X01.pendingTotal(g);
       var pad = '<div class="pad total">' +
         '<div class="quickrow">' + quick.map(function (q) {
-          /* A named chip shows only its label; the rest show their number. */
+          if (q.fire) {
+            var fits = (g.fire || 0) + q.fire <= 2 && total + q.fire * 60 <= 180;
+            return '<button class="key quick fire" data-act="fire" data-v="' + q.fire + '"' +
+              (fits ? '' : ' disabled') +
+              ' aria-label="' + UI.esc(q.name) + ', add ' + q.fire * 60 + '">' +
+              X01.chipLabel(q.name, q.emoji) + '<span class="q-pts">+' + q.fire * 60 + '</span></button>';
+          }
           return '<button class="key quick" data-act="quick" data-v="' + q.v + '"' +
-            (q.name ? ' aria-label="' + UI.esc(q.name) + ', ' + q.v + '"' : '') + '>' +
-            (q.name ? X01.chipLabel(q.name, q.emoji)
-                    : '<span class="q-val">' + q.v + '</span>') + '</button>';
+            ' aria-label="' + UI.esc(q.name) + ', ' + q.v + '">' +
+            X01.chipLabel(q.name, q.emoji) + '<span class="q-pts">' + q.v + '</span></button>';
         }).join('') + '</div><div class="numpad">';
       [7, 8, 9, 4, 5, 6, 1, 2, 3].forEach(function (d, i) {
         if (i % 3 === 0) pad += '<div class="numrow">';
@@ -528,7 +564,7 @@
              '<button class="key alt" data-act="back">&#9003;</button>' +
              '<button class="key num" data-act="dig" data-v="0">0</button>' +
              '<button class="key alt go" data-act="enter"' +
-               (g.pending === '' ? ' disabled' : '') + '>ENTER</button>' +
+               (X01.hasPending(g) ? '' : ' disabled') + '>ENTER</button>' +
              '</div></div></div>';
       return pad;
     }

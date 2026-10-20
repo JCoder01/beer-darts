@@ -484,7 +484,7 @@
 
     undo: function () {
       App.game = App.mod().undo(App.game);
-      App.game.pending = '';   /* never restore a half-typed total */
+      if (App.game.type === 'x01') X01.clearPending(App.game);   /* never restore a half-typed total */
       UI.buzz(10);
       App.render();
     },
@@ -567,25 +567,24 @@
       }
       if (act === 'endturn') { X01.snapshot(g); X01.endTurn(g, false); return App.render(); }
 
-      if (act === 'dig') {
-        if (g.pending.length < 3) {
-          var next = (g.pending + v).replace(/^0+(?=\d)/, '');
-          if (+next <= 180) g.pending = next;
-        }
+      if (act === 'dig') { X01.typeDigit(g, v); return App.render(); }
+      if (act === 'back') { X01.backspace(g); return App.render(); }
+      /* 🔥 and 🔥🔥 start a total rather than finish one; the rest submit. */
+      if (act === 'fire') {
+        if (!X01.addFire(g, v)) { UI.toast('That would be over 180'); return; }
         return App.render();
       }
-      if (act === 'back') { g.pending = g.pending.slice(0, -1); return App.render(); }
-      if (act === 'quick') { g.pending = String(v); return App.submitTotal(); }
+      if (act === 'quick') { X01.clearPending(g); g.pending = String(v); return App.submitTotal(); }
       if (act === 'enter') return App.submitTotal();
     },
 
     submitTotal: function () {
       var g = App.game;
-      var total = +g.pending;
-      if (g.pending === '' || isNaN(total)) return;
+      if (!X01.hasPending(g)) return;
+      var total = X01.pendingTotal(g);
 
       if (Checkout.impossibleTotal(total)) {
-        g.pending = '';
+        X01.clearPending(g);
         App.render();
         return UI.modal({ title: 'Not possible', html: '<p>No three darts make ' + total + '.</p>' });
       }
@@ -743,7 +742,7 @@
         g.players[g.cur].score = g.turn.start;
         g.turn = { darts: [], start: g.turn.start };
       }
-      g.pending = '';
+      X01.clearPending(g);
       g.mult = 1;
       UI.buzz(16);
       App.render();
@@ -782,16 +781,13 @@
       if (g.type !== 'x01' || g.entry !== 'total' || g.over || g.diddle) return;
 
       if (/^\d$/.test(e.key)) {
-        if (g.pending.length < 3) {
-          var next = (g.pending + e.key).replace(/^0+(?=\d)/, '');
-          if (+next <= 180) g.pending = next;
-        }
+        X01.typeDigit(g, e.key);
         App.render();
       } else if (e.key === 'Backspace') {
         e.preventDefault();
-        g.pending = g.pending.slice(0, -1);
+        X01.backspace(g);
         App.render();
-      } else if (e.key === 'Enter' && g.pending !== '') {
+      } else if (e.key === 'Enter' && X01.hasPending(g)) {
         App.submitTotal();
       }
     },
@@ -924,6 +920,8 @@
           'appears the moment one exists for the darts you have left. The turn ends after three ' +
           'darts, or tap END to finish early.</p>' +
           '<p><b>3-dart total</b> — type the whole visit and press ENTER, or tap a common score. ' +
+          'Each shortcut shows its points. A 🔥 is a treble twenty: 🔥 and 🔥🔥 add 60 or 120 ' +
+          'and let you type the rest (🔥🔥 then 1 is 121), while 🔥🔥🔥 is the full 180. ' +
           'Checkouts are shown for a full three darts.</p>' +
           '<p><b>Swipe the keypad left or right</b> to flip between the two entry modes ' +
           'without opening this menu.</p>' +

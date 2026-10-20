@@ -549,8 +549,10 @@ html.js-vh #app { height: var(--app-h); }
   font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
 }
 .key.slang .q-emoji { font-size: 28px; }
-.q-val { font-size: 16px; font-weight: 800; color: var(--amber); font-variant-numeric: tabular-nums; }
-.key.slang .q-val { font-size: 15px; }
+/* What a shortcut is worth, under its face. */
+.q-pts { font-size: 11.5px; font-weight: 800; color: var(--dim); line-height: 1; font-variant-numeric: tabular-nums; }
+.key.slang .q-pts { font-size: 13px; }
+.key.quick.fire .q-pts { color: var(--amber); }
 .pad.total .numpad {
   flex: 1 1 auto;
   min-height: 0;

@@ -33,11 +33,15 @@ Two ways to score, switchable mid-game from the menu:
 opening the menu. A short, slow, or mostly-vertical drag is ignored, and the tap
 underneath a swipe never registers as a throw.
 
-The 3-dart quick row is all named scores: **Fuck All** (0), **🥓🍳**
-breakfast (26), **🐟🍟** fish and chips (41), **🥜** bag o' nuts (45),
-**🔥** sixty, **💯** a ton (100), **🔥🔥** one twenty and
-**🔥🔥🔥** the maximum (180) — one flame per treble twenty. Each
-carries its name in `aria-label`, so an emoji face is still announced.
+The 3-dart quick row is all named scores, each with its points under it:
+**Fuck All** (0), **🥓🍳** breakfast (26), **🐟🍟** fish and chips (41),
+**🥜** bag o' nuts (45), **💯** a ton (100) and **🔥🔥🔥** the maximum (180).
+One flame is one treble twenty, so **🔥** (+60) and **🔥🔥** (+120) don't
+submit — they start the total and the keypad finishes it: 🔥🔥 then `1` is
+121. The entry shows the sum as it builds (`120 + 1 = 121`), `⌫` takes the
+last digit and then the last flame, and a flame that would pass 180 is
+greyed out. Each chip carries its name in `aria-label`, so an emoji face is
+still announced.
 
 Dart by dart gets **🥓🍳**, **🐟🍟** and **Fuck All**, and expands each into the
 actual darts — 20-5-1 for a breakfast, 20-20-1 for fish and chips, three misses
