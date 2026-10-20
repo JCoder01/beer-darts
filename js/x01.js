@@ -285,7 +285,7 @@
     lastPill: function (last) {
       if (last === null || last === undefined) return '';
       var cls = last === 'BUST' ? ' bust' : last >= 100 ? ' big' : '';
-      return '<span class="pc-last' + cls + '">' + (last === 'BUST' ? 'BUST' : '&minus;' + last) + '</span>';
+      return '<span class="pc-last' + cls + '"><span class="pc-last-k">Last:</span> ' + last + '</span>';
     },
 
     /* Every visit so far, a table per leg: a row per round, a column per

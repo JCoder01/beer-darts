@@ -339,9 +339,10 @@ html.js-vh #app { height: var(--app-h); }
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
+.pc-last-k { font-size: 11px; font-weight: 700; color: var(--dim); }
 .pc-last.big { color: var(--amber); border-color: #5a4a1f; background: #2a2415; }
 .pc-last.bust { color: var(--red); border-color: #5a2626; background: #2a1414; font-size: 13px; }
-.pc-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 0; margin-top: 2px; font-size: 11.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
+.pc-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; min-height: 0; margin-top: 2px; font-size: 11.5px; color: var(--dim); font-variant-numeric: tabular-nums; }
 .pc-avg { margin-left: auto; white-space: nowrap; }
 .pc-tag { margin-top: 3px; font-size: 10.5px; color: var(--amber); }
 
