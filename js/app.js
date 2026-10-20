@@ -436,6 +436,7 @@
       var left = old ? old.scrollLeft : 0;
 
       host.innerHTML = App.mod().render(g);
+      host.classList.toggle('diddling', !!g.diddle);
 
       var strip = host.querySelector('.players');
       if (strip) {
@@ -506,6 +507,13 @@
       if (!b || b.disabled) return;
       var g = App.game, act = b.dataset.act, v = +b.dataset.v;
       UI.buzz(act === 'menu' || act === 'undo' ? 10 : 14);
+
+      if (g.diddle) {
+        if (act === 'first') { X01.setFirst(g, +b.dataset.i); return App.render(); }
+        if (act === 'skip-diddle') { g.diddle = false; return App.render(); }
+        if (act === 'diddle-back') { App.game = null; App.save(); App.show('setup'); }
+        return;
+      }
 
       if (act === 'menu') return App.menu();
       if (act === 'undo') return App.undo();
@@ -739,7 +747,7 @@
       if (!App.game || document.querySelector('.backdrop')) return;
       var g = App.game;
       if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); return App.undo(); }
-      if (g.type !== 'x01' || g.entry !== 'total' || g.over) return;
+      if (g.type !== 'x01' || g.entry !== 'total' || g.over || g.diddle) return;
 
       if (/^\d$/.test(e.key)) {
         if (g.pending.length < 3) {
@@ -825,6 +833,9 @@
           'so busts and checkouts still work normally.</p>' +
           '<p>Busts revert the whole turn. With double out, leaving 1 is a bust, and only a double ' +
           'finishes. Switch entry mode any time from the menu.</p>' +
+          '<p><b>Diddle in the Middle</b> — before the first leg, everyone throws one dart at ' +
+          'the bull; tap whoever landed closest and they throw first. Skip keeps the order ' +
+          'from setup. Later legs rotate the starter as usual.</p>' +
           '<p><b>Press and hold a score</b> — the big one or a player card — to type in a ' +
           'correction directly, instead of undoing dart by dart.</p>' +
           '<h3>Cricket</h3>' +

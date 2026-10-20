@@ -31,8 +31,17 @@
         turn: { darts: [], start: cfg.start },
         mult: 1, pending: '', flash: null,
         over: false, winner: null, announce: null,
+        /* Throw for the middle before the first leg; nothing to settle solo. */
+        diddle: cfg.players.length > 1,
         history: []
       };
+    },
+
+    /* Whoever won the diddle starts; later legs rotate on from them. */
+    setFirst: function (g, i) {
+      g.cur = g.legStarter = i;
+      g.turn = { darts: [], start: g.players[i].score };
+      g.diddle = false;
     },
 
     /* history -------------------------------------------------- */
@@ -170,6 +179,7 @@
 
     /* render --------------------------------------------------- */
     render: function (g) {
+      if (g.diddle) return X01.renderDiddle(g);
       var e = UI.esc;
       var p = g.players[g.cur];
       var left = X01.dartsLeft(g);
@@ -252,6 +262,25 @@
 
       return header + '<div class="players">' + cards + '</div>' +
         focus + turnzone + X01.pad(g);
+    },
+
+    /* Before the first leg: one dart each at the bull, closest throws first. */
+    renderDiddle: function (g) {
+      var e = UI.esc;
+      return '<header class="topbar">' +
+          '<button class="btn ghost" data-act="diddle-back" aria-label="Back to setup">&#8249;</button>' +
+          '<div class="brand">Diddle in the <span>Middle</span></div>' +
+        '</header>' +
+        '<div class="scroll"><div class="panel">' +
+          '<h2>Who throws first?</h2>' +
+          '<div class="diddle-list">' + g.players.map(function (pl, i) {
+            return '<button class="btn xl" data-act="first" data-i="' + i + '">' + e(pl.name) + '</button>';
+          }).join('') + '</div>' +
+          '<p class="hint">One dart each at the bull. Tap whoever landed closest.</p>' +
+        '</div></div>' +
+        '<footer class="bottombar">' +
+          '<button class="btn wide" data-act="skip-diddle">Skip &mdash; ' + e(g.players[0].name) + ' throws first</button>' +
+        '</footer>';
     },
 
     pad: function (g) {

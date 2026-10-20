@@ -194,6 +194,10 @@ html.js-vh #app { height: var(--app-h); }
 .prow-btn.del { font-size: 22px; }
 .prow-btn.del:active { background: var(--red); color: #fff; }
 
+/* Diddle in the Middle: one big target per player. */
+.diddle-list { display: flex; flex-direction: column; gap: var(--gap); }
+.diddle-list .btn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* Roster picker */
 .roster { display: flex; flex-direction: column; gap: 4px; max-height: 56vh; max-height: 56dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .roster .empty { text-align: center; padding: 18px 0; }
@@ -770,9 +774,10 @@ html.js-vh #app { height: var(--app-h); }
 /* Landscape is wide and short, so stacking wastes the width and starves the
    keypad of height. Split into two columns instead: everything you read on
    the left, everything you tap on the right. The ID beats .screen.active's
-   display:flex, and the areas let three separate siblings share one column. */
+   display:flex, and the areas let three separate siblings share one column.
+   The diddle picker has none of these parts, so it stays a plain column. */
 @media (orientation: landscape) {
-  #screen-x01.active {
+  #screen-x01.active:not(.diddling) {
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: auto auto 1fr auto;
