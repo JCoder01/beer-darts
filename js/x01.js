@@ -269,15 +269,22 @@
       var e = UI.esc;
       return '<header class="topbar">' +
           '<button class="btn ghost" data-act="diddle-back" aria-label="Back to setup">&#8249;</button>' +
-          '<div class="brand">Diddle in the <span>Middle</span></div>' +
+          '<div class="topinfo">' + g.start + ' &middot; ' + MODE_NAME[g.outMode] + '</div>' +
+          '<span class="btn ghost" aria-hidden="true"></span>' +   /* balances the back arrow */
         '</header>' +
-        '<div class="scroll"><div class="panel">' +
-          '<h2>Who throws first?</h2>' +
-          '<div class="diddle-list">' + g.players.map(function (pl, i) {
-            return '<button class="btn xl" data-act="first" data-i="' + i + '">' + e(pl.name) + '</button>';
-          }).join('') + '</div>' +
-          '<p class="hint">One dart each at the bull. Tap whoever landed closest.</p>' +
-        '</div></div>' +
+        '<div class="scroll">' +
+          '<div class="diddle-hero">' +
+            '<div class="dh-icon" aria-hidden="true">🎯</div>' +
+            '<h1 class="dh-title">Diddle in the <span>Middle</span></h1>' +
+            '<p class="dh-sub">One dart each at the bull. Tap whoever landed closest.</p>' +
+          '</div>' +
+          '<div class="panel">' +
+            '<h2>Who throws first?</h2>' +
+            '<div class="diddle-list">' + g.players.map(function (pl, i) {
+              return '<button class="btn xl" data-act="first" data-i="' + i + '">' + e(pl.name) + '</button>';
+            }).join('') + '</div>' +
+          '</div>' +
+        '</div>' +
         '<footer class="bottombar">' +
           '<button class="btn wide" data-act="skip-diddle">Skip &mdash; ' + e(g.players[0].name) + ' throws first</button>' +
         '</footer>';

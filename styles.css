@@ -194,7 +194,26 @@ html.js-vh #app { height: var(--app-h); }
 .prow-btn.del { font-size: 22px; }
 .prow-btn.del:active { background: var(--red); color: #fff; }
 
-/* Diddle in the Middle: one big target per player. */
+/* Diddle in the Middle: a moment of ceremony, then one big target per player. */
+.diddle-hero { text-align: center; padding: 18px 8px 22px; }
+.dh-icon { font-size: 64px; line-height: 1; margin-bottom: 10px; }
+.dh-title {
+  margin: 0;
+  font-size: 38px;
+  font-size: clamp(30px, 10vw, 52px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -.01em;
+}
+.dh-title span { color: var(--accent); display: block; font-size: 1.25em; }
+.dh-sub { margin: 12px auto 0; max-width: 28em; font-size: 15px; line-height: 1.45; color: var(--dim); }
+@media (orientation: landscape) and (max-height: 620px) {
+  .diddle-hero { padding: 8px 8px 12px; }
+  .dh-icon { display: none; }
+  .dh-title { font-size: 30px; }
+  .dh-title span { display: inline; font-size: 1em; }
+}
+
 .diddle-list { display: flex; flex-direction: column; gap: var(--gap); }
 .diddle-list .btn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
