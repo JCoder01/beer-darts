@@ -5,22 +5,39 @@
   var KEY = 'beerdarts.v1';
   var MAX_NAME = 24;
 
+  /* The league's teams, spelled exactly as the schedule spells them. Bump
+   * SEASON when this changes: a device that already stored the old list
+   * swaps it for this one on its next load, keeping any names added by hand. */
+  var SEASON = '2026-fall';
   var SEED_ROSTER = [
     'Bad News Beers',
-    'Minute Man Militia',
     'Boston Brits',
-    'MENACE',
-    'Projectile Dysfunction',
-    'Dart Siders',
-    "At least We're Cute",
-    'Jammy Dodgers',
-    'Mrs Turner',
-    'BullsHitters',
-    'The Sharts',
     "Boys who Don't read good",
+    'BullsHitters',
+    'Dart Siders',
+    'Darts and Rec.',
+    'Darty Dancin’',
+    'Därtley Crüe',
+    'Duck',
+    'Flight Club.',
     'Good Grouping!',
-    'Duck'
+    'Jammie Dodgers',
+    'Medford Misfits',
+    'Mrs Turner',
+    'Projectile Dysfunction',
+    'Somervillains',
+    'Teenage Dartbags',
+    'The Sharts',
+    'Villain Cruisers',
+    'Who Darted?'
   ];
+
+  /* Every earlier season's built-in names, so they can be told apart from
+   * names a player typed in, and renames that should follow a team across. */
+  var PAST_SEEDS = [
+    'Minute Man Militia', 'MENACE', "At least We're Cute", 'Jammy Dodgers'
+  ];
+  var RENAMED = { 'Jammy Dodgers': 'Jammie Dodgers' };
 
   /* What each named shortcut actually throws. A breakfast is definitionally
    * 20-5-1; 41 has no canonical throw, so it uses the common 20-20-1. */
@@ -208,13 +225,25 @@
             .map(function (r) { return typeof r === 'string' ? r : (r && r.name); })
             .filter(Boolean);
         }
+        if (d.season !== SEASON) App.newSeason();
       } catch (e) { /* corrupt or unavailable storage: start fresh */ }
+    },
+
+    /* New league list, same device: this season's teams first, then whatever
+     * was typed in by hand. Old built-in teams that left the league go. */
+    newSeason: function () {
+      var custom = App.roster.filter(function (n) {
+        return PAST_SEEDS.indexOf(n) === -1 && SEED_ROSTER.indexOf(n) === -1;
+      });
+      App.roster = SEED_ROSTER.concat(custom);
+      App.cfg.players = App.cfg.players.map(function (n) { return RENAMED[n] || n; });
+      App.save();
     },
 
     save: function () {
       try {
         localStorage.setItem(KEY, JSON.stringify({
-          cfg: App.cfg, game: App.game, roster: App.roster
+          cfg: App.cfg, game: App.game, roster: App.roster, season: SEASON
         }));
       } catch (e) { /* private mode / quota: play on without persistence */ }
     },

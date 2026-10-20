@@ -71,7 +71,14 @@ html.js-vh #app { height: var(--app-h); }
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.brand { flex: 1; font-size: 20px; font-weight: 700; letter-spacing: .01em; }
+.brand { flex: 1; min-width: 0; font-size: 20px; font-weight: 700; letter-spacing: .01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Two words beside the brand, so they come down from icon size to fit. */
+#screen-setup .topbar .btn { font-size: 16px; padding: 0 10px; }
+@media (max-width: 360px) {
+  #screen-setup .topbar { gap: 2px; }
+  #screen-setup .topbar .brand { font-size: 17px; }
+  #screen-setup .topbar .btn { font-size: 15px; padding: 0 7px; min-width: 0; }
+}
 .brand span { color: var(--accent); }
 
 .bottombar {
@@ -96,6 +103,16 @@ html.js-vh #app { height: var(--app-h); }
 .btn.ghost { background: transparent; border-color: transparent; font-size: 22px; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #06210f; }
 .btn.danger { background: var(--red); border-color: var(--red); color: #2a0808; }
+/* A link dressed as a button: same box, none of the link styling. */
+.btn.link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--txt);
+  text-decoration: none;
+  touch-action: manipulation;
+  -webkit-touch-callout: default;   /* a real link, so let iOS offer its menu */
+}
 .btn.wide { width: 100%; }
 .btn.xl { width: 100%; min-height: 62px; font-size: 20px; }
 
