@@ -798,16 +798,67 @@
 
     /* menus ---------------------------------------------------- */
     /* Opens scrolled to the bottom, where the latest visit is. */
-    ledger: function () {
+    ledger: function (keepScroll) {
+      var g = App.game;
+      /* Cricket corrections stay open after the game ends; X01 edits do not. */
+      var hint = !(g.rounds && g.rounds.length) ? ''
+        : g.type === 'cricket' ? '<p class="lg-hint">Tap a number in this leg to take back one of those marks.</p>'
+        : g.over ? '' : '<p class="lg-hint">Tap a round in this leg to change its score.</p>';
       UI.modal({
         title: 'Ledger',
         wide: true,
-        html: App.mod().ledgerHtml(App.game),
+        html: hint + App.mod().ledgerHtml(g),
         actions: [{ label: 'Close', value: null, kind: 'primary' }],
         onOpen: function (wrap) {
           var m = wrap.querySelector('.modal');
-          m.scrollTop = m.scrollHeight;
+          m.scrollTop = keepScroll != null ? keepScroll : m.scrollHeight;
+          m.addEventListener('click', function (ev) {
+            var cell = ev.target.closest('[data-ri], [data-cp]');
+            if (!cell) return;
+            var top = m.scrollTop;
+            m.parentElement.querySelector('.modal-actions .btn').click();   /* close, then edit */
+            if (cell.dataset.ri != null) App.editRound(+cell.dataset.ri, top);
+            else App.takeBack(+cell.dataset.cp, +cell.dataset.ct, top);
+          });
         }
+      });
+    },
+
+    /* X01: a new total for one visit, then straight back to the ledger. */
+    editRound: function (ri, top) {
+      var g = App.game, row = g.rounds[ri];
+      var pl = g.players[row.p];
+      UI.prompt('Change ' + pl.name + '’s score', row.bust ? '' : String(row.scored), '0–180',
+        { numeric: true, min: 0, max: 180 }
+      ).then(function (val) {
+        if (val === null) return App.ledger(top);
+        var n = parseInt(val, 10);
+        if (!/^\d+$/.test(val) || n > 180) {
+          return UI.modal({ title: 'Out of range', html: '<p>Pick a whole number from 0 to 180.</p>' })
+            .then(function () { App.editRound(ri, top); });
+        }
+        var err = X01.editRound(g, ri, n);
+        if (err) {
+          return UI.modal({ title: 'Can’t change that', html: '<p>' + UI.esc(err) + '</p>' })
+            .then(function () { App.ledger(top); });
+        }
+        App.render();
+        App.ledger(top);
+      });
+    },
+
+    /* Cricket: one mark off, through the same path as a long-press correction. */
+    takeBack: function (pi, t, top) {
+      var g = App.game;
+      var name = g.players[pi].name, lbl = t === 25 ? 'bull' : String(t);
+      UI.modal({
+        title: 'Take back a mark?',
+        html: '<p>Remove one of ' + UI.esc(name) + '’s marks on ' + lbl +
+          ', and any points it scored.</p>',
+        actions: [{ label: 'Cancel', value: false }, { label: 'Take back', value: true, kind: 'danger' }]
+      }).then(function (ok) {
+        if (ok && Cricket.undoMark(g, pi, t)) App.render();
+        App.ledger(top);
       });
     },
 
@@ -886,7 +937,9 @@
           'the bull; tap whoever landed closest and they throw first. Skip keeps the order ' +
           'from setup. Later legs rotate the starter as usual.</p>' +
           '<p>Each player card shows that player\'s last visit beside their score. ' +
-          '<b>Tap a card</b>, or Ledger at the top, to see every round of the game so far.</p>' +
+          '<b>Tap a card</b>, or Ledger at the top, to see every round of the game so far. ' +
+          'Tap a round in the current leg to change its score; that player\'s later ' +
+          'remaining scores move with it.</p>' +
           '<p><b>Press and hold a score</b> — the big one or a player card — to type in a ' +
           'correction directly, instead of undoing dart by dart.</p>' +
           '<h3>Cricket</h3>' +
@@ -901,7 +954,8 @@
           'Long-press that team again, or tap Done, to leave.</p>' +
           '<p><b>Tap a team\'s name</b>, or Ledger at the top, to see every mark so far. ' +
           'Marks on one team with nobody else marked in between share a row, which is ' +
-          'usually one visit; take-backs get a row of their own.</p>' +
+          'usually one visit; take-backs get a row of their own. Tap a number in the ' +
+          'current leg to take back one of those marks.</p>' +
           '<h3>Anywhere</h3>' +
           '<p>The arrow in the top right undoes a dart at a time. Add this page to your home ' +
           'screen to run it fullscreen and offline.</p>'

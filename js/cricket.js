@@ -214,8 +214,15 @@
             if (gl && gl.t === m.t) gl.n++;
             else groups.push({ t: m.t, n: 1 });
           });
+          /* In the leg in play, each number is a take-back button while that
+           * team still has a mark on it -- the same correction a long-press
+           * offers, so the points come off exactly as they went on. */
           var marks = groups.map(function (gp) {
-            return (run.undo ? '&minus;' : '') + label(gp.t) + (gp.n > 1 ? '&times;' + gp.n : '');
+            var txt = (run.undo ? '&minus;' : '') + label(gp.t) + (gp.n > 1 ? '&times;' + gp.n : '');
+            var live = leg === g.leg && !run.undo && Cricket.cellLog(g, run.p, gp.t).length > 0;
+            return live
+              ? '<button class="lg-mk" data-cp="' + run.p + '" data-ct="' + gp.t + '">' + txt + '</button>'
+              : txt;
           }).join(' &middot; ');
 
           /* Cutthroat hands points to the others, so say whose they are. */

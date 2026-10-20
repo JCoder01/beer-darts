@@ -294,9 +294,15 @@
       var e = UI.esc, rows = g.rounds || [], n = g.players.length, html = '', leg;
       if (!rows.length) return '<p>No rounds yet.</p>';
 
+      /* Each copy remembers its place in g.rounds, so a tapped cell can say
+       * which visit to change even after a correction has been merged in. */
+      var indexed = rows.map(function (r, ri) { return Object.assign({ ri: ri }, r); });
+
       for (leg = 1; leg <= g.leg; leg++) {
-        var inLeg = rows.filter(function (r) { return r.leg === leg; });
+        var inLeg = indexed.filter(function (r) { return r.leg === leg; });
         if (!inLeg.length) continue;
+        /* Only the leg in play can change; an earlier one may have decided a winner. */
+        var editable = leg === g.leg && !g.over;
 
         var first = inLeg[0].p, order = [], i;
         for (i = 0; i < n; i++) order.push((first + i) % n);
@@ -325,7 +331,9 @@
             if (!v) return '<td></td>';
             var main = v.edit ? '&#9998;' : v.bust ? 'BUST' : v.scored;
             var cls = v.edit ? 'edit' : v.bust ? 'bust' : v.out ? 'out' : v.scored >= 100 ? 'big' : '';
-            return '<td class="' + cls + '"><span class="lg-sc">' + main + '</span>' +
+            var tap = editable && !v.edit && !v.out;
+            return '<td class="' + cls + (tap ? ' can-edit' : '') + '"' + (tap ? ' data-ri="' + v.ri + '"' : '') + '>' +
+              '<span class="lg-sc">' + main + (v.changed ? '<sup class="lg-mark">&#9998;</sup>' : '') + '</span>' +
               '<span class="lg-left">' + (v.out ? 'out' : v.left) + '</span>' +
               (v.darts && v.darts.length ? '<span class="lg-darts">' + e(v.darts.join(' ')) + '</span>' : '') +
               (v.fixed != null ? '<span class="lg-fix">&#9998; ' + v.fixed + '</span>' : '') +
@@ -341,6 +349,71 @@
         }).join('') + '</tr></tfoot></table></div>';
       }
       return html;
+    },
+
+    /* Change one visit's total after the fact. Every later visit by that
+     * player keeps what it scored, so their remaining scores all shift by
+     * the difference; refuse the change if any of them would no longer be a
+     * legal place to stand. Returns an error to show, or null once applied. */
+    editRound: function (g, ri, total) {
+      var row = g.rounds[ri];
+      if (!row || row.leg !== g.leg || row.edit || row.out || g.over) return 'That round can no longer be changed.';
+      if (Checkout.impossibleTotal(total)) return 'No three darts make ' + total + '.';
+      var pi = row.p, p = g.players[pi];
+
+      /* The walk below rebuilds the leg from the ledger alone, so first make
+       * sure the ledger holds all of it: a game started before rounds were
+       * logged, for one, would land somewhere the player is not. */
+      var check = g.start;
+      g.rounds.forEach(function (x) {
+        if (x.p !== pi || x.leg !== g.leg) return;
+        check = x.edit ? x.left : check - (x.bust ? 0 : x.scored);
+      });
+      if (check !== (g.cur === pi ? g.turn.start : p.score)) {
+        return 'This leg started before the ledger did, so its rounds can\'t be changed. Hold the score to correct it instead.';
+      }
+
+      /* Walk the player's leg with the new value, checking each landing. */
+      var s = g.start, lefts = [], k, r;
+      for (k = 0; k < g.rounds.length; k++) {
+        r = g.rounds[k];
+        if (r.p !== pi || r.leg !== g.leg) continue;
+        if (r.edit) { s = r.left; lefts.push([k, s]); continue; }
+        var scored = k === ri ? total : r.scored;
+        s -= scored;
+        if (s < 0 || (s === 1 && g.outMode !== 'straight')) {
+          return 'That would leave ' + p.name + ' on ' + s + (k === ri ? '' : ' by a later round') + '.';
+        }
+        if (s === 0) return 'That would be a checkout. Undo back to that round to finish the leg instead.';
+        lefts.push([k, s]);
+      }
+
+      /* A turn in progress sits on top of the last landing, so it moves too. */
+      var delta = (row.bust ? 0 : row.scored) - total;
+      var inTurn = g.cur === pi ? g.turn.start - p.score : 0;
+      var after = s - inTurn;
+      if (after < 0 || (after === 1 && g.outMode !== 'straight')) {
+        return 'That would leave the turn in progress on ' + after + '.';
+      }
+
+      X01.snapshot(g);
+      lefts.forEach(function (kl) { g.rounds[kl[0]].left = kl[1]; });
+      p.scored -= delta;
+      row.scored = total;
+      row.bust = false;
+      row.changed = true;
+      row.darts = null;   /* the darts no longer add up to it */
+      if (g.cur === pi) g.turn.start = s;
+      p.score = after;
+      if (total > 0) p.opened = true;
+
+      /* Best and last come from the ledger, which is now the truth. */
+      var mine = g.rounds.filter(function (x) { return x.p === pi && !x.edit; });
+      p.best = mine.reduce(function (b, x) { return x.bust ? b : Math.max(b, x.scored); }, 0);
+      var last = mine[mine.length - 1];
+      if (last) p.last = last.bust ? 'BUST' : last.scored;
+      g.flash = null;
+      return null;
     },
 
     /* Before the first leg: one dart each at the bull, closest throws first. */
