@@ -50,6 +50,10 @@ breakfast is definitionally 20-5-1; 41 has no canonical throw, so it uses the
 common 20-20-1. The two scoring ones grey out once a turn is under way, since
 they need all three darts.
 
+It also gets a single **🔥**, which is one dart, a treble twenty (60). Unlike
+the others it doesn't take the whole turn: tap it whenever a T20 lands, and
+three in a row is the maximum.
+
 Busts revert the whole turn: going below zero, leaving 1, or reaching zero without
 a legal finishing dart. Undo steps back one dart at a time; to fix a score from
 further back, **press and hold it** — the big number or a player card — and type

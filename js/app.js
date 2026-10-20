@@ -44,6 +44,9 @@
   var SLANG_DARTS = {
     breakfast: [[20, 1, 'S20'], [5, 1, 'S5'], [1, 1, 'S1']],
     fishchips: [[20, 1, 'S20'], [20, 1, 'S20'], [1, 1, 'S1']],
+    /* The dart-by-dart 🔥: one treble twenty, and the turn carries on. Not
+     * 'fire' -- that is the 3-dart-total chip, which adds to a total. */
+    t20:       [[20, 3, 'T20']],
     fuckall:   [[0, 1, 'MISS'], [0, 1, 'MISS'], [0, 1, 'MISS']]
   };
 
@@ -928,7 +931,8 @@
           '<p><b>Bacon and eggs</b> is a breakfast (26), <b>fish and chips</b> is 41, ' +
           '<b>100</b> is a ton, and <b>Fuck All</b> is a scoreless visit. Dart by dart they ' +
           'fill in the actual darts — 20, 5, 1 for a breakfast and three misses for fuck all — ' +
-          'so busts and checkouts still work normally.</p>' +
+          'so busts and checkouts still work normally. The dart-by-dart 🔥 is a single dart, ' +
+          'a treble twenty, so tap it once per T20 and the turn carries on.</p>' +
           '<p>Busts revert the whole turn. With double out, leaving 1 is a bust, and only a double ' +
           'finishes. Switch entry mode any time from the menu.</p>' +
           '<p><b>Diddle in the Middle</b> — before the first leg, everyone throws one dart at ' +

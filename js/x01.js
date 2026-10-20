@@ -499,6 +499,7 @@
         '<div class="slangrow">' +
           X01.slangKey('breakfast', 'Breakfast', BACON_EGGS, 26, X01.dartsLeft(g) < 3) +
           X01.slangKey('fishchips', 'Fish and chips', FISH_CHIPS, 41, X01.dartsLeft(g) < 3) +
+          X01.slangKey('t20', 'Treble twenty', FIRE, 60, X01.dartsLeft(g) < 1) +
           X01.slangKey('fuckall', 'Fuck All', '', 0, X01.dartsLeft(g) < 1) +
         '</div>' +
         '<div class="botrow">' +

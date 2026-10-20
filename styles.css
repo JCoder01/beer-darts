@@ -506,7 +506,7 @@ html.js-vh #app { height: var(--app-h); }
   gap: var(--gap);
 }
 .numrow > .key { flex: 1 1 0; min-width: 0; }
-.slangrow { flex: 0 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); }
+.slangrow { flex: 0 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gap); }
 .slangrow .key { min-height: 58px; }
 .botrow { flex: 0 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gap); }
 .botrow .key { min-height: 58px; font-size: 15px; }
@@ -548,7 +548,9 @@ html.js-vh #app { height: var(--app-h); }
   line-height: 1;
   font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
 }
-.key.slang .q-emoji { font-size: 28px; }
+/* Four to a row now, so a pair like 🥓🍳 must shrink rather than wrap onto
+   a second line -- a taller row starves the number grid on small phones. */
+.key.slang .q-emoji { font-size: 28px; font-size: clamp(16px, 6.4vw, 28px); white-space: nowrap; }
 /* What a shortcut is worth, under its face. */
 .q-pts { font-size: 11.5px; font-weight: 800; color: var(--dim); line-height: 1; font-variant-numeric: tabular-nums; }
 .key.slang .q-pts { font-size: 13px; }
