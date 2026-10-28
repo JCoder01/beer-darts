@@ -258,8 +258,8 @@
       var header =
         '<header class="topbar">' +
           '<button class="btn ghost" data-act="menu" aria-label="Menu">&#9776;</button>' +
-          '<div class="topinfo">Cricket &middot; ' + VARIANT_NAME[g.variant] +
-            (g.legsToWin > 1 ? ' &middot; Leg ' + g.leg : '') + '</div>' +
+          '<div class="topinfo">' + (g.tag ? e(g.tag) : 'Cricket &middot; ' + VARIANT_NAME[g.variant] +
+            (g.legsToWin > 1 ? ' &middot; Leg ' + g.leg : '')) + '</div>' +
           '<button class="btn ledger-btn" data-act="ledger">Ledger</button>' +
           '<button class="btn ghost" data-act="undo"' + (g.history.length ? '' : ' disabled') +
             ' aria-label="Undo">&#8630;</button>' +
@@ -306,7 +306,8 @@
           (g.variant === 'noscore'
             ? ''
             : '<div class="ch-score">' + p.score + '</div>') +
-          (g.legsToWin > 1 ? '<div class="ch-legs">legs ' + p.legs + '</div>' : '') +
+          (g.matchLegs ? '<div class="ch-legs">legs ' + g.matchLegs[i] + '</div>'
+            : g.legsToWin > 1 ? '<div class="ch-legs">legs ' + p.legs + '</div>' : '') +
         '</div>';
       }
 

@@ -989,3 +989,19 @@ html.js-vh #app { height: var(--app-h); }
   pointer-events: none;
   white-space: nowrap;
 }
+
+/* ── MBC Darts ─────────────────────────────────────────────── */
+.mbc-leg { display: flex; align-items: center; }
+.mbc-rows { max-height: none; }
+.mbc-rows .rrow { flex-shrink: 0; }
+.mbc-who {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 45%;
+  font-size: 13px;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mbc-rows .rrow.on .mbc-who { color: var(--accent); }

@@ -61,9 +61,11 @@
       type: 'x01',
       start: 501, entry: 'darts', outMode: 'double', doubleIn: 0, legs: 1,
       variant: 'standard', range: 'std', clegs: 1,
+      mbcOrder: MBC.ORDER.slice(),
       players: ['Bad News Beers', 'Player 2']
     },
     game: null,
+    match: null,   /* an MBC Darts night: App.game is whichever leg is in play */
     roster: SEED_ROSTER.slice(),
 
     /* Load index.html?debug to get a readout of the real geometry, so a device
@@ -222,6 +224,8 @@
         var d = JSON.parse(raw);
         if (d.cfg) Object.keys(d.cfg).forEach(function (k) { App.cfg[k] = d.cfg[k]; });
         if (d.game && d.game.players && d.game.players.length) App.game = d.game;
+        if (App.game && d.match && d.match.legs) App.match = d.match;
+        if (!MBC.validOrder(App.cfg.mbcOrder)) App.cfg.mbcOrder = MBC.ORDER.slice();
         if (d.roster && d.roster.length) {
           /* Older builds stored objects with records; keep just the names. */
           App.roster = d.roster
@@ -246,7 +250,7 @@
     save: function () {
       try {
         localStorage.setItem(KEY, JSON.stringify({
-          cfg: App.cfg, game: App.game, roster: App.roster, season: SEASON
+          cfg: App.cfg, game: App.game, match: App.match, roster: App.roster, season: SEASON
         }));
       } catch (e) { /* private mode / quota: play on without persistence */ }
     },
@@ -298,7 +302,36 @@
       }
       document.getElementById('opts-x01').hidden = App.cfg.type !== 'x01';
       document.getElementById('opts-cricket').hidden = App.cfg.type !== 'cricket';
+      document.getElementById('opts-mbc').hidden = App.cfg.type !== 'mbc';
       document.getElementById('variant-hint').textContent = VARIANT_HINT[App.cfg.variant];
+      document.getElementById('players-title').innerHTML = App.cfg.type === 'mbc'
+        ? 'Teams &mdash; pick the two playing' : 'Players &mdash; throwing order';
+      App.renderMbcOrder();
+    },
+
+    /* The night's planned leg order, rearranged like the player list. */
+    renderMbcOrder: function () {
+      var o = App.cfg.mbcOrder, last = o.length - 1;
+      document.getElementById('mbc-list').innerHTML = o.map(function (k, i) {
+        var name = MBC.label(o, i);
+        return '<li class="prow">' +
+          '<span class="prow-n">' + (i + 1) + '</span>' +
+          '<span class="prow-name mbc-leg">' + UI.esc(name) + '</span>' +
+          '<button class="prow-btn" data-act="mbc-up" data-i="' + i + '"' +
+            (i === 0 ? ' disabled' : '') + ' aria-label="Move ' + UI.esc(name) + ' earlier">&uarr;</button>' +
+          '<button class="prow-btn" data-act="mbc-down" data-i="' + i + '"' +
+            (i === last ? ' disabled' : '') + ' aria-label="Move ' + UI.esc(name) + ' later">&darr;</button>' +
+        '</li>';
+      }).join('');
+    },
+
+    moveLeg: function (i, delta) {
+      var a = App.cfg.mbcOrder, j = i + delta;
+      if (j < 0 || j >= a.length) return;
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+      UI.buzz(10);
+      App.renderMbcOrder();
+      App.save();
     },
 
     renderPlayers: function () {
@@ -425,6 +458,15 @@
         App.cfg.players.splice(i, 1);
         App.renderPlayers();
         App.save();
+      } else if (act === 'mbc-up') {
+        App.moveLeg(i, -1);
+      } else if (act === 'mbc-down') {
+        App.moveLeg(i, 1);
+      } else if (act === 'mbc-reset') {
+        UI.buzz(10);
+        App.cfg.mbcOrder = MBC.ORDER.slice();
+        App.renderMbcOrder();
+        App.save();
       } else if (act === 'start') {
         App.start();
       } else if (act === 'help') {
@@ -442,6 +484,15 @@
         UI.modal({ title: 'Add a player', html: '<p>Cricket needs at least two players.</p>' });
         return;
       }
+      App.match = null;
+      if (c.type === 'mbc') {
+        if (c.players.length !== 2) {
+          UI.modal({ title: 'Pick two teams', html: '<p>MBC Darts is one team against another, so pick exactly two.</p>' });
+          return;
+        }
+        App.match = MBC.create(c.players, c.mbcOrder);
+        return App.playLeg(MBC.next(App.match));
+      }
       App.game = c.type === 'x01'
         ? X01.create({
             start: c.start, outMode: c.outMode, doubleIn: !!c.doubleIn,
@@ -455,12 +506,35 @@
       App.save();
     },
 
+    /* One leg of an MBC match, as its own single-leg game. Whatever was in
+     * play before is simply replaced: an unfinished leg goes back to unplayed. */
+    playLeg: function (i) {
+      var m = App.match, leg = m.legs[i], k = MBC.KINDS[leg.kind];
+      m.cur = i;
+      App.game = k.type === 'x01'
+        ? X01.create({
+            start: k.start, outMode: 'double', doubleIn: false,
+            legs: 1, entry: App.cfg.entry, players: m.teams.slice()
+          })
+        : Cricket.create({ variant: 'standard', range: 'std', legs: 1, players: m.teams.slice() });
+      App.game.tag = leg.name + ' · Leg ' + (MBC.played(m) + 1) + ' of ' + m.legs.length;
+      App.show(App.game.type);
+      App.render();
+      return true;
+    },
+
     /* game loop ------------------------------------------------ */
     mod: function () { return App.game.type === 'x01' ? X01 : Cricket; },
 
     render: function () {
       var g = App.game;
       var host = document.getElementById('screen-' + g.type);
+      if (App.match) {
+        /* A won leg's point counts from now, so the cards behind the win
+         * modal already show it; Undo there takes it back off. */
+        if (g.announce) App.match.legs[App.match.cur].winner = g.announce.player;
+        g.matchLegs = MBC.score(App.match);
+      }
 
       /* The screen is re-rendered wholesale after every dart, which would
        * otherwise throw the player strip back to the left on each throw. */
@@ -507,6 +581,8 @@
           '<p class="win-stat">Score <b>' + p.score + '</b></p>';
       }
 
+      if (App.match) return App.announceMatchLeg(a, p, stats);
+
       var actions = [{ label: 'Undo', value: 'undo' }];
       if (a.over) {
         actions.push({ label: 'Rematch', value: 'rematch' });
@@ -532,6 +608,133 @@
       });
     },
 
+    /* An MBC leg is a one-leg game, so every win ends it. render() has
+     * already counted the point. */
+    announceMatchLeg: function (a, p, stats) {
+      var m = App.match;
+      var s = MBC.score(m), done = MBC.over(m), nx = MBC.next(m);
+      var actions = [{ label: 'Undo', value: 'undo' }, { label: done ? 'Match' : 'Choose leg', value: 'pick' }];
+      actions.push(done
+        ? { label: 'New match', value: 'new', kind: 'primary' }
+        : { label: 'Next: ' + m.legs[nx].name, value: 'next', kind: 'primary' });
+
+      UI.modal({
+        title: done ? MBC.result(m) : p.name + ' takes the leg',
+        html: '<p class="win-legs">' + m.teams.map(function (t, i) {
+            return UI.esc(t) + ' ' + s[i];
+          }).join(' &middot; ') + '</p>' + stats +
+          (done ? App.matchRows(false) : ''),
+        actions: actions,
+        dismissible: false
+      }).then(function (v) {
+        if (v === 'undo') { m.legs[m.cur].winner = null; return App.undo(); }
+        if (v === 'next') return App.playLeg(nx);
+        if (v === 'pick') {
+          /* Closing the match screen without starting anything comes back here. */
+          return App.matchScreen().then(function (moved) {
+            if (moved || !App.game || !App.match) return;
+            App.game.announce = a;
+            App.announce();
+          });
+        }
+        App.endMatch();
+      });
+    },
+
+    /* The legs in planned order: won, in play, or still to come. With `taps`,
+     * each row is a button -- start an unplayed leg, or correct a won one. */
+    matchRows: function (taps) {
+      var m = App.match, g = App.game;
+      return '<div class="roster mbc-rows">' + m.legs.map(function (l, i) {
+        /* The leg just played is corrected with Undo, not from here. */
+        var cur = i === m.cur, live = cur && l.winner == null;
+        var mark = l.winner != null ? '&#10003;' : live ? '&#9654;' : String(i + 1);
+        var who = l.winner != null ? m.teams[l.winner] : live ? (g && g.over ? '' : 'in play') : '';
+        var row = '<span class="rr-check">' + mark + '</span>' +
+          '<span class="rr-name">' + UI.esc(l.name) + '</span>' +
+          '<span class="mbc-who">' + UI.esc(who) + '</span>';
+        return taps && !cur
+          ? '<button class="rrow' + (l.winner != null ? ' on' : '') + '" data-leg="' + i + '">' + row + '</button>'
+          : '<div class="rrow' + (live || l.winner != null ? ' on' : '') + '">' + row + '</div>';
+      }).join('') + '</div>';
+    },
+
+    /* Resolves true once it has moved play on (a new leg, or the match
+     * ended), false if it was closed with play left where it was. */
+    matchScreen: function () {
+      var m = App.match, picked = null, s = MBC.score(m);
+      return UI.modal({
+        title: 'Match',
+        wide: true,
+        html: '<p class="win-legs">' + m.teams.map(function (t, i) {
+            return UI.esc(t) + ' ' + s[i];
+          }).join(' &middot; ') + '</p>' +
+          '<p class="lg-hint">Tap a leg to play it next, or a finished one to change who won it.</p>' +
+          App.matchRows(true),
+        actions: [
+          { label: 'End match', value: 'end', kind: 'danger' },
+          { label: 'Close', value: null, kind: 'primary' }
+        ],
+        onOpen: function (w) {
+          w.querySelector('.mbc-rows').addEventListener('click', function (ev) {
+            var r = ev.target.closest('[data-leg]');
+            if (!r) return;
+            picked = +r.dataset.leg;
+            w.querySelector('.modal-actions .btn.primary').click();
+          });
+        }
+      }).then(function (v) {
+        if (v === 'end') {
+          return UI.modal({
+            title: 'End match?',
+            html: '<p>The whole match, every leg of it, is discarded.</p>',
+            actions: [{ label: 'Cancel', value: false }, { label: 'End match', value: true, kind: 'danger' }]
+          }).then(function (ok) {
+            if (!ok) return App.matchScreen();
+            App.endMatch();
+            return true;
+          });
+        }
+        if (picked == null) return false;
+        var leg = m.legs[picked];
+
+        if (leg.winner != null) {
+          return UI.modal({
+            title: leg.name,
+            html: '<p>Who won it? Or put it back to be played again.</p>',
+            actions: m.teams.map(function (t, i) {
+              return { label: t, value: i, kind: leg.winner === i ? 'primary' : '' };
+            }).concat([{ label: 'Not played', value: 'clear', kind: 'danger' }])
+          }).then(function (v) {
+            if (v === 'clear') leg.winner = null;
+            else if (v != null) leg.winner = v;
+            if (App.game) App.render();
+            return App.matchScreen();
+          });
+        }
+
+        /* Leaving a leg part-thrown loses its scores; say so first. */
+        var g = App.game;
+        var started = g && !g.over && m.legs[m.cur].winner == null &&
+          (g.history.length || (g.rounds && g.rounds.length));
+        if (!started) return App.playLeg(picked);
+        return UI.modal({
+          title: 'Play ' + leg.name + ' now?',
+          html: '<p>' + UI.esc(m.legs[m.cur].name) + ' has been started. Its scores are cleared and it goes back in the list to play later.</p>',
+          actions: [{ label: 'Cancel', value: false }, { label: 'Switch leg', value: true, kind: 'danger' }]
+        }).then(function (ok) {
+          return ok ? App.playLeg(picked) : App.matchScreen();
+        });
+      });
+    },
+
+    endMatch: function () {
+      App.match = null;
+      App.game = null;
+      App.save();
+      App.show('setup');
+    },
+
     /* X01 input ------------------------------------------------ */
     onX01Click: function (ev) {
       if (App.clickSuppressed()) return;
@@ -543,7 +746,10 @@
       if (g.diddle) {
         if (act === 'first') { X01.setFirst(g, +b.dataset.i); return App.render(); }
         if (act === 'skip-diddle') { g.diddle = false; return App.render(); }
-        if (act === 'diddle-back') { App.game = null; App.save(); App.show('setup'); }
+        if (act === 'diddle-back') {
+          if (App.match) return App.matchScreen();   /* back to the night, not setup */
+          App.game = null; App.save(); App.show('setup');
+        }
         return;
       }
 
@@ -866,6 +1072,7 @@
       var actions = [{ label: 'Resume', value: null, kind: 'primary' }];
       if (g.history.length) actions.push({ label: 'Undo last dart', value: 'undo' });
       actions.push({ label: 'Ledger', value: 'ledger' });
+      if (App.match) actions.push({ label: 'Match', value: 'match' });
       if (g.type === 'x01') {
         actions.push({
           label: g.entry === 'darts' ? 'Switch to 3-dart total' : 'Switch to dart by dart',
@@ -874,11 +1081,12 @@
       }
       actions.push({ label: 'Restart leg', value: 'restart' });
       actions.push({ label: 'Help', value: 'help' });
-      actions.push({ label: 'End game', value: 'end' });
+      if (!App.match) actions.push({ label: 'End game', value: 'end' });
 
       UI.modal({ title: 'Menu', actions: actions }).then(function (v) {
         if (v === 'undo') return App.undo();
         if (v === 'ledger') return App.ledger();
+        if (v === 'match') return App.matchScreen();
         if (v === 'entry') return App.setEntry(g.entry === 'darts' ? 'total' : 'darts');
         if (v === 'restart') {
           return UI.modal({
@@ -958,6 +1166,15 @@
           'Marks on one team with nobody else marked in between share a row, which is ' +
           'usually one visit; take-backs get a row of their own. Tap a number in the ' +
           'current leg to take back one of those marks.</p>' +
+          '<h3>MBC Darts</h3>' +
+          '<p>A league night: two teams, eight legs, a point a leg &mdash; two team 501, two ' +
+          'team cricket and four singles 401. Pick the two teams and set the leg order on the ' +
+          'setup screen. 501 and 401 are double out with Diddle in the Middle; cricket is ' +
+          'standard.</p>' +
+          '<p>After each leg, <b>Next</b> starts the next one in the plan, or <b>Choose leg</b> ' +
+          'picks any unplayed leg instead. <b>Match</b> in the menu shows every leg; tap an ' +
+          'unplayed one to switch to it, or a finished one to change who won it. Eight legs ' +
+          'can split 4&ndash;4, which is a draw.</p>' +
           '<h3>Anywhere</h3>' +
           '<p>The arrow in the top right undoes a dart at a time. Add this page to your home ' +
           'screen to run it fullscreen and offline.</p>'

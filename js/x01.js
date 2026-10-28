@@ -227,9 +227,9 @@
       var header =
         '<header class="topbar">' +
           '<button class="btn ghost" data-act="menu" aria-label="Menu">&#9776;</button>' +
-          '<div class="topinfo">' + g.start + ' &middot; ' + MODE_NAME[g.outMode] +
+          '<div class="topinfo">' + (g.tag ? e(g.tag) : g.start + ' &middot; ' + MODE_NAME[g.outMode] +
             (g.doubleIn ? ' &middot; Double in' : '') +
-            (g.legsToWin > 1 ? ' &middot; Leg ' + g.leg : '') + '</div>' +
+            (g.legsToWin > 1 ? ' &middot; Leg ' + g.leg : '')) + '</div>' +
           '<button class="btn ledger-btn" data-act="ledger">Ledger</button>' +
           '<button class="btn ghost" data-act="undo"' + (g.history.length ? '' : ' disabled') +
             ' aria-label="Undo">&#8630;</button>' +
@@ -240,7 +240,8 @@
         var a = X01.avg(pl);
         return '<div class="pcard' + (i === g.cur ? ' on' : '') + '" data-i="' + i + '" data-act="ledger">' +
           '<div class="pc-top"><span class="pc-name">' + e(pl.name) + '</span>' +
-            (g.legsToWin > 1 ? '<span class="pc-legs">' + pl.legs + '</span>' : '') + '</div>' +
+            (g.matchLegs ? '<span class="pc-legs">' + g.matchLegs[i] + '</span>'
+              : g.legsToWin > 1 ? '<span class="pc-legs">' + pl.legs + '</span>' : '') + '</div>' +
           '<div class="pc-score">' + pl.score + '</div>' +
           '<div class="pc-meta">' + X01.lastPill(pl.last) +
             '<span class="pc-avg">avg ' + (a ? a.toFixed(1) : '&ndash;') + '</span></div>' +
@@ -456,7 +457,7 @@
       var e = UI.esc;
       return '<header class="topbar">' +
           '<button class="btn ghost" data-act="diddle-back" aria-label="Back to setup">&#8249;</button>' +
-          '<div class="topinfo">' + g.start + ' &middot; ' + MODE_NAME[g.outMode] + '</div>' +
+          '<div class="topinfo">' + (g.tag ? e(g.tag) : g.start + ' &middot; ' + MODE_NAME[g.outMode]) + '</div>' +
           '<span class="btn ghost" aria-hidden="true"></span>' +   /* balances the back arrow */
         '</header>' +
         '<div class="scroll">' +

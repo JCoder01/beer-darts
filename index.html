@@ -29,6 +29,7 @@
       <div class="seg xl" data-opt="type">
         <button class="seg-btn active" data-v="x01">X01</button>
         <button class="seg-btn" data-v="cricket">Cricket</button>
+        <button class="seg-btn" data-v="mbc">MBC Darts</button>
       </div>
 
       <div class="panel" id="opts-x01">
@@ -95,8 +96,21 @@
         </div>
       </div>
 
+      <div class="panel" id="opts-mbc" hidden>
+        <h2>Leg order</h2>
+        <ol id="mbc-list" class="player-list"></ol>
+        <button class="btn wide" data-act="mbc-reset">League order</button>
+        <p class="hint">Two teams, eight legs, a point a leg. 501 and 401 are double out and start with Diddle in the Middle; cricket is standard, 15–20 and bull. Play the legs in any order: this is just the plan, and the Match screen in the menu lets you start any unplayed leg next.</p>
+
+        <h2>Score entry</h2>
+        <div class="seg" data-opt="entry">
+          <button class="seg-btn active" data-v="darts">Dart by dart</button>
+          <button class="seg-btn" data-v="total">3-dart total</button>
+        </div>
+      </div>
+
       <div class="panel">
-        <h2>Players &mdash; throwing order</h2>
+        <h2 id="players-title">Players &mdash; throwing order</h2>
         <ol id="player-list" class="player-list"></ol>
         <button class="btn wide" data-act="add-player">+ Add from players</button>
       </div>
@@ -119,6 +133,7 @@
 <script src="js/ui.js"></script>
 <script src="js/x01.js"></script>
 <script src="js/cricket.js"></script>
+<script src="js/mbc.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 # Beer Darts
 
 A touch-first darts scoreboard for **X01** and **Cricket**, with live checkout
-suggestions. No build step, no dependencies — open `index.html` and play.
+suggestions, and an **MBC Darts** mode for a whole league match night. No build step, no dependencies — open `index.html` and play.
 
 ## Running it
 
@@ -100,6 +100,26 @@ Its marks turn into take-back buttons; tapping one removes its last mark and
 reverses exactly the points it earned, leaving everything else where it is. The
 other team stays live the whole time. Long-press that team again, or tap Done,
 to leave.
+
+## MBC Darts
+
+The brewery league's match: two teams, eight legs, one point per leg. The
+league order is two **Team 501**, two **Team Cricket** and four **Singles
+401**. Setup takes exactly two teams and shows the eight legs as a list you
+rearrange with the arrows, like the throwing order (**League order** puts it
+back). 501 and 401 are double out, straight in, and each starts with Diddle in
+the Middle; cricket is standard, 15–20 and bull. Score entry carries over, and
+is switchable mid-leg as usual.
+
+Each leg is an ordinary single-leg game, with its name and position ("Singles
+401 · 2 · Leg 5 of 8") in the top bar and the match score on each team's
+card. When a leg is won the point is counted and the modal offers **Next:**
+the next leg in the plan, or **Choose leg** to pick any unplayed one; Undo
+takes the point back with the dart. The plan is only a plan: **Match** in the
+menu lists every leg, and tapping an unplayed one switches to it (an
+already-started leg is cleared and goes back in the list), while tapping a
+finished one corrects who won it or marks it unplayed. After the eighth leg
+it shows the result; 4–4 is a draw.
 
 ## Touch details
 
@@ -224,6 +244,7 @@ styles.css          all styling
 js/checkout.js      checkout search and ranking, out-mode rules
 js/x01.js           X01 rules and rendering
 js/cricket.js       Cricket rules and rendering
+js/mbc.js           MBC Darts match: leg plan, order, result
 js/app.js           setup, persistence, menus, input wiring
 sw.js               offline cache
 Dockerfile          static image, nginx on 8080 as uid 101
