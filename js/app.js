@@ -62,6 +62,7 @@
       start: 501, entry: 'darts', outMode: 'double', doubleIn: 0, legs: 1,
       variant: 'standard', range: 'std', clegs: 1,
       mbcOrder: MBC.ORDER.slice(),
+      projector: 0, projectorDir: 'cw',
       players: ['Bad News Beers', 'Player 2']
     },
     game: null,
@@ -157,6 +158,17 @@
 
     /* boot ----------------------------------------------------- */
     init: function () {
+      /* Projector mode: this page only hosts the rotated frame, and the
+       * app proper runs inside it. Nothing here may touch storage. */
+      if (!Projector.inFrame && Projector.read().on) {
+        App.off = true;
+        return Projector.mount();
+      }
+      if (Projector.inFrame) {
+        document.documentElement.classList.add('pj-frame');
+        /* Fullscreen only comes from a gesture, so any tap restores it. */
+        document.addEventListener('click', Projector.ensureFull, true);
+      }
       App.trackHeight();
       App.detectFlexGap();
       App.debugOverlay();
@@ -248,6 +260,7 @@
     },
 
     save: function () {
+      if (App.off) return;   /* the projector host: the frame owns storage */
       try {
         localStorage.setItem(KEY, JSON.stringify({
           cfg: App.cfg, game: App.game, match: App.match, roster: App.roster, season: SEASON
@@ -303,6 +316,8 @@
       document.getElementById('opts-x01').hidden = App.cfg.type !== 'x01';
       document.getElementById('opts-cricket').hidden = App.cfg.type !== 'cricket';
       document.getElementById('opts-mbc').hidden = App.cfg.type !== 'mbc';
+      var pq = document.querySelector('.pj-quick');
+      if (pq) pq.classList.toggle('on', !!App.cfg.projector);
       document.getElementById('variant-hint').textContent = VARIANT_HINT[App.cfg.variant];
       document.getElementById('players-title').innerHTML = App.cfg.type === 'mbc'
         ? 'Teams &mdash; pick the two playing' : 'Players &mdash; throwing order';
@@ -433,6 +448,7 @@
         App.cfg[opt] = /^-?\d+$/.test(v) ? +v : v;
         App.syncSetup();
         App.save();
+        if (opt === 'projector' || opt === 'projectorDir') Projector.sync();
         return;
       }
 
@@ -471,7 +487,17 @@
         App.start();
       } else if (act === 'help') {
         App.help();
+      } else if (act === 'projector') {
+        App.toggleProjector();
       }
+    },
+
+    toggleProjector: function () {
+      UI.buzz(12);
+      App.cfg.projector = App.cfg.projector ? 0 : 1;
+      App.syncSetup();
+      App.save();
+      Projector.sync();
     },
 
     start: function () {
@@ -984,7 +1010,7 @@
 
     /* keyboard (handy when scoring from a laptop) --------------- */
     onKey: function (e) {
-      if (!App.game || document.querySelector('.backdrop')) return;
+      if (App.off || !App.game || document.querySelector('.backdrop')) return;
       var g = App.game;
       if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); return App.undo(); }
       if (g.type !== 'x01' || g.entry !== 'total' || g.over || g.diddle) return;
@@ -1080,6 +1106,7 @@
         });
       }
       actions.push({ label: 'Restart leg', value: 'restart' });
+      actions.push({ label: App.cfg.projector ? 'Projector mode: off' : 'Projector mode: on', value: 'projector' });
       actions.push({ label: 'Help', value: 'help' });
       if (!App.match) actions.push({ label: 'End game', value: 'end' });
 
@@ -1105,6 +1132,7 @@
           });
         }
         if (v === 'help') return App.help();
+        if (v === 'projector') return App.toggleProjector();
         if (v === 'end') {
           return UI.modal({
             title: 'End game?',
@@ -1175,6 +1203,12 @@
           'picks any unplayed leg instead. <b>Match</b> in the menu shows every leg; tap an ' +
           'unplayed one to switch to it, or a finished one to change who won it. Eight legs ' +
           'can split 4&ndash;4, which is a draw.</p>' +
+          '<h3>Projector mode</h3>' +
+          '<p>For a projector on its side: lock the tablet in landscape and turn on ' +
+          '<b>Projector mode</b> (setup screen, the 📽️ button, or this menu). The scoreboard ' +
+          'is drawn turned 90° to fill the screen; pick Clockwise or Counter-clockwise so it ' +
+          'reads upright on the wall. The first tap hides the system bars. Number prompts get ' +
+          'an on-screen keypad, since the system keyboard does not turn.</p>' +
           '<h3>Anywhere</h3>' +
           '<p>The arrow in the top right undoes a dart at a time. Add this page to your home ' +
           'screen to run it fullscreen and offline.</p>'

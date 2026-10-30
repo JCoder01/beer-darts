@@ -1005,3 +1005,48 @@ html.js-vh #app { height: var(--app-h); }
   text-overflow: ellipsis;
 }
 .mbc-rows .rrow.on .mbc-who { color: var(--accent); }
+
+/* ── projector mode ────────────────────────────────────────── */
+/* The host page is just the rotated frame; js/projector.js sizes it to the
+   screen with width and height swapped, centred, then turned. */
+html.pj-host, html.pj-host body { background: #000; }
+#pj-frame {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  display: block;
+  border: 0;
+  background: var(--bg);
+}
+#screen-setup .topbar .pj-quick { font-size: 21px; padding: 0 8px; min-width: 44px; border: 1px solid transparent; }
+/* An emoji ignores color, so on shows as a lit outline instead. */
+#screen-setup .topbar .pj-quick.on { border-color: var(--accent); background: rgba(46, 226, 127, .14); }
+
+/* The number keypad that stands in for the system keyboard in projector mode. */
+.kp-display {
+  min-height: 56px;
+  margin-bottom: 10px;
+  padding: 6px 14px;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 2px solid var(--accent);
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 40px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.kp-display.empty { color: #4e6076; }
+.kp-display.fresh { color: var(--amber); }
+.kp-grid { display: flex; flex-wrap: wrap; gap: var(--gap); }
+.kp-key {
+  flex: 1 0 30%;
+  min-height: 54px;
+  border-radius: 12px;
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  font-size: 22px;
+  font-weight: 700;
+}
+.kp-key:active { background: #2b3a4a; }
+.no-flexgap .kp-grid > * { margin: 0 var(--gap) var(--gap) 0; }

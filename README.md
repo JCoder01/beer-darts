@@ -121,6 +121,43 @@ already-started leg is cleared and goes back in the list), while tapping a
 finished one corrects who won it or marks it unplayed. After the eighth leg
 it shows the result; 4–4 is a draw.
 
+## Projector mode
+
+For mirroring the tablet to a projector over Miracast. Miracast always sends a
+landscape 16:9 frame, so a portrait scoreboard arrives small with black bars
+either side. Instead: lock the tablet in landscape, lay the projector on its
+side, and turn on **Projector mode (rotate 90°)** on the setup screen. The
+scoreboard is laid out portrait (600×1024 on a 1024×600 tablet) and turned
+90° to fill the landscape screen edge to edge, so it is upright and full size
+on the wall, and upright on the tablet held in portrait. **Clockwise** or
+**Counter-clockwise** picks the turn, for whichever side the projector lies
+on. Both are saved. The 📽️ button in the setup bar and **Projector mode** in
+the game menu flip it without scrolling to the setting.
+
+How it works: the page becomes a host for one rotated iframe of the app
+(`js/projector.js`). An iframe is its own viewport, so inside it the app
+really is portrait — every media query, `vh` unit and the measured `--app-h`
+see 600×1024, and there is no projector copy of the stylesheet. Modals and
+toasts live inside the frame, so they turn with it. Taps are hit-tested
+through the transform by the browser, and touch coordinates arrive in the
+frame's own space, so the keypad swipe is still left/right in the rotated
+view. Off, none of it runs: the page is the plain app.
+
+The host asks for fullscreen, which hides the status and navigation bars
+(they do not rotate, and would sit as a strip down one side of the projected
+picture), then `screen.orientation.lock('landscape')`. Both need a tap, so
+after a restart or a swipe out of fullscreen the next tap anywhere brings them
+back; launched from the home-screen icon the manifest is already fullscreen.
+If the screen is portrait anyway (no lock, tablet held upright), the frame
+fills it unturned.
+
+What cannot turn with it, because Android draws it: the system keyboard, so
+number prompts (custom start score, score corrections) get an on-screen
+keypad in projector mode, while typing a name still opens the sideways
+keyboard; text-selection handles, notifications and permission dialogs; and
+the Schedule link, which opens an ordinary tab. 1024×600 is a little narrower
+than 16:9, so Miracast adds a thin strip along the long edges of the picture.
+
 ## Touch details
 
 Big targets throughout, no hover-dependent affordances, `touch-action: manipulation`
@@ -245,6 +282,7 @@ js/checkout.js      checkout search and ranking, out-mode rules
 js/x01.js           X01 rules and rendering
 js/cricket.js       Cricket rules and rendering
 js/mbc.js           MBC Darts match: leg plan, order, result
+js/projector.js     projector mode: rotated frame host, fullscreen, orientation lock
 js/app.js           setup, persistence, menus, input wiring
 sw.js               offline cache
 Dockerfile          static image, nginx on 8080 as uid 101

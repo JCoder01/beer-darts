@@ -62,6 +62,9 @@
      * Pass {numeric:true, min, max} for a number pad on touch keyboards. */
     prompt: function (title, value, placeholder, opts) {
       opts = opts || {};
+      if (opts.numeric && document.documentElement.classList.contains('pj-frame')) {
+        return UI.keypadPrompt(title, value, placeholder, opts);
+      }
       var input;
       var attrs = opts.numeric
         ? 'type="number" inputmode="numeric" pattern="[0-9]*" min="' + opts.min + '" max="' + opts.max + '"'
@@ -84,6 +87,52 @@
         if (v === null) return null;
         var t = (input.value || '').trim();
         return t || null;
+      });
+    },
+
+    /* Projector mode's number prompt. The system keyboard is drawn in the
+     * screen's own landscape, sideways to a rotated app and across the
+     * projected picture, so numbers get keys of their own. Same contract as
+     * prompt(): the typed string, or null. */
+    keypadPrompt: function (title, value, placeholder, opts) {
+      var val = String(value || ''), fresh = true;
+      var digits = String(opts.max == null ? 9999 : opts.max).length;
+      var keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', '⌫'];
+      return UI.modal({
+        title: title,
+        html: '<div class="kp-display" aria-live="polite"></div>' +
+          '<div class="kp-grid">' + keys.map(function (k) {
+            return '<button class="kp-key" data-k="' + k + '"' +
+              (k === '⌫' ? ' aria-label="Delete"' : k === 'C' ? ' aria-label="Clear"' : '') + '>' + k + '</button>';
+          }).join('') + '</div>',
+        actions: [
+          { label: 'Cancel', value: null },
+          { label: 'Save', value: '\u0000', kind: 'primary' }
+        ],
+        onOpen: function (w) {
+          var shown = w.querySelector('.kp-display');
+          function paint() {
+            shown.textContent = val || placeholder || '';
+            shown.classList.toggle('empty', !val);
+            shown.classList.toggle('fresh', fresh && !!val);
+          }
+          paint();
+          w.querySelector('.kp-grid').addEventListener('click', function (e) {
+            var b = e.target.closest('[data-k]');
+            if (!b) return;
+            UI.buzz(8);
+            var k = b.dataset.k;
+            /* Like a selected input: the first digit replaces what was there. */
+            if (k === 'C') val = '';
+            else if (k === '⌫') val = fresh ? '' : val.slice(0, -1);
+            else val = (fresh ? '' : val).length < digits ? (fresh ? '' : val) + k : val;
+            fresh = false;
+            paint();
+          });
+        }
+      }).then(function (v) {
+        if (v === null) return null;
+        return val || null;
       });
     },
 

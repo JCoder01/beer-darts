@@ -22,6 +22,8 @@
       <div class="brand">🎯 <span>Beer Darts</span></div>
       <a class="btn ghost link" href="https://playpass.com/medford-brewing-darts-ODQQTxr/20-player-darts-schedule-RF1euZP"
          target="_blank" rel="noopener">Schedule</a>
+      <button class="btn ghost pj-quick" data-act="projector" aria-label="Projector mode (rotate 90°)"
+              title="Projector mode (rotate 90°)">&#128253;&#xFE0F;</button>
       <button class="btn ghost" data-act="help">Help</button>
     </header>
 
@@ -114,6 +116,20 @@
         <ol id="player-list" class="player-list"></ol>
         <button class="btn wide" data-act="add-player">+ Add from players</button>
       </div>
+
+      <div class="panel">
+        <h2>Projector mode (rotate 90°)</h2>
+        <div class="seg" data-opt="projector">
+          <button class="seg-btn active" data-v="0">Off</button>
+          <button class="seg-btn" data-v="1">On</button>
+        </div>
+        <h2>Turn</h2>
+        <div class="seg" data-opt="projectorDir">
+          <button class="seg-btn active" data-v="cw">&#8635; Clockwise</button>
+          <button class="seg-btn" data-v="ccw">&#8634; Counter-clockwise</button>
+        </div>
+        <p class="hint">For mirroring to a projector laid on its side: lock the tablet in landscape and the scoreboard is drawn turned 90°, full size. Pick whichever turn makes it read upright on the wall. The first tap hides the system bars. Also in the game menu, and the projector button at the top.</p>
+      </div>
     </div>
 
     <footer class="bottombar">
@@ -129,6 +145,7 @@
 
 <div id="modal-root"></div>
 
+<script src="js/projector.js"></script>
 <script src="js/checkout.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/x01.js"></script>
