@@ -1050,3 +1050,10 @@ html.pj-host, html.pj-host body { background: #000; }
 }
 .kp-key:active { background: #2b3a4a; }
 .no-flexgap .kp-grid > * { margin: 0 var(--gap) var(--gap) 0; }
+
+/* Team logos stand in for the name text on the scoreboard. */
+.name-logo { display: block; height: 30px; width: auto; max-width: 100%; margin: 0 auto; object-fit: contain; }
+.pc-name .name-logo { margin: 0; height: 30px; }
+.focus-name .name-logo { height: 54px; height: clamp(40px, 8vh, 72px); }
+.ch-name .name-logo { height: 30px; }
+.btn .name-logo { height: 34px; }

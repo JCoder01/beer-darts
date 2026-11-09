@@ -15,5 +15,6 @@ COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 # cannot rewrite them.
 COPY index.html diag.html styles.css icon.svg manifest.webmanifest sw.js /usr/share/nginx/html/
 COPY js/ /usr/share/nginx/html/js/
+COPY img/ /usr/share/nginx/html/img/
 
 EXPOSE 8080

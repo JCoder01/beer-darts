@@ -3,8 +3,8 @@
  * triggers install -> activate -> clients.claim and purges the old cache.
  * Without a bump, a device that's already installed the worker can keep
  * serving what it fetched on day one indefinitely. */
-var CACHE = 'beer-darts-v20';
-var ASSETS = ['./', './index.html', './styles.css', './icon.svg', './manifest.webmanifest',
+var CACHE = 'beer-darts-v21';
+var ASSETS = ['./', './index.html', './styles.css', './icon.svg', './img/bad-news-beers.png', './manifest.webmanifest',
   './js/projector.js', './js/checkout.js', './js/ui.js', './js/x01.js', './js/cricket.js', './js/mbc.js', './js/app.js'];
 
 self.addEventListener('install', function (e) {

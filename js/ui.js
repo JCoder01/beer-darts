@@ -11,6 +11,16 @@
       });
     },
 
+    /* A team name as scoreboard HTML. Teams with a logo show it (the alt text
+     * keeps the name readable to screen readers); everyone else is plain text. */
+    LOGOS: { 'bad news beers': 'img/bad-news-beers.png' },
+    nameHtml: function (name) {
+      var src = UI.LOGOS[String(name).trim().toLowerCase()];
+      return src
+        ? '<img class="name-logo" src="' + src + '" alt="' + UI.esc(name) + '">'
+        : UI.esc(name);
+    },
+
     clone: function (o) { return JSON.parse(JSON.stringify(o)); },
 
     buzz: function (ms) {

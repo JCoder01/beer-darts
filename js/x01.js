@@ -239,7 +239,7 @@
       var cards = g.players.map(function (pl, i) {
         var a = X01.avg(pl);
         return '<div class="pcard' + (i === g.cur ? ' on' : '') + '" data-i="' + i + '" data-act="ledger">' +
-          '<div class="pc-top"><span class="pc-name">' + e(pl.name) + '</span>' +
+          '<div class="pc-top"><span class="pc-name">' + UI.nameHtml(pl.name) + '</span>' +
             (g.matchLegs ? '<span class="pc-legs">' + g.matchLegs[i] + '</span>'
               : g.legsToWin > 1 ? '<span class="pc-legs">' + pl.legs + '</span>' : '') + '</div>' +
           '<div class="pc-score">' + pl.score + '</div>' +
@@ -294,7 +294,7 @@
        * entering belongs down by the keypad where the thumb is. */
       var focus =
         '<div class="focus">' + flash +
-          '<div class="focus-name">' + e(p.name) + '</div>' +
+          '<div class="focus-name">' + UI.nameHtml(p.name) + '</div>' +
           '<div class="focus-score">' + p.score + '</div>' +
           co +
         '</div>';
@@ -469,7 +469,7 @@
           '<div class="panel">' +
             '<h2>Who throws first?</h2>' +
             '<div class="diddle-list">' + g.players.map(function (pl, i) {
-              return '<button class="btn xl" data-act="first" data-i="' + i + '">' + e(pl.name) + '</button>';
+              return '<button class="btn xl" data-act="first" data-i="' + i + '" aria-label="' + e(pl.name) + '">' + UI.nameHtml(pl.name) + '</button>';
             }).join('') + '</div>' +
           '</div>' +
         '</div>' +

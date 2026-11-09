@@ -302,7 +302,7 @@
         var p = g.players[i];
         /* Tapping a team opens the ledger; holding it still starts a correction. */
         return '<div class="ch' + (editN === i ? ' editing' : '') + '" data-i="' + i + '" data-act="ledger">' +
-          '<div class="ch-name">' + e(p.name) + '</div>' +
+          '<div class="ch-name">' + UI.nameHtml(p.name) + '</div>' +
           (g.variant === 'noscore'
             ? ''
             : '<div class="ch-score">' + p.score + '</div>') +
