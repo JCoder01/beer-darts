@@ -292,3 +292,7 @@ k8s/                deployment, service, Traefik ingress, kustomization
 
 `js/checkout.js` has no dependencies and `x01.js` / `cricket.js` depend only on it
 plus `UI.esc`, so the rules can be exercised headlessly in Node.
+
+## Copyright
+
+Copyright (c) 2026 James Coder. All rights reserved.

@@ -6,8 +6,7 @@
 FROM nginxinc/nginx-unprivileged:1.27-alpine
 
 LABEL org.opencontainers.image.title="beer-darts" \
-      org.opencontainers.image.description="Touch-first darts scoreboard for X01 and Cricket" \
-      org.opencontainers.image.licenses="MIT"
+      org.opencontainers.image.description="Touch-first darts scoreboard for X01 and Cricket"
 
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 
