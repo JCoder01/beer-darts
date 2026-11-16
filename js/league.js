@@ -41,6 +41,25 @@
     RENAMED: { 'Jammy Dodgers': 'Jammie Dodgers' },
 
     /* Teams drawn as a logo on the scoreboard, keyed by lower-cased name. */
-    LOGOS: { 'bad news beers': 'img/bad-news-beers.png' }
+    LOGOS: { 'bad news beers': 'img/bad-news-beers.png' },
+
+    /* Whose tablet this is until someone says otherwise: the team loaded
+     * first on the setup screen. Changed from the Players picker. */
+    HOME_TEAM: 'Bad News Beers',
+
+    /* Every game of the season as [date, team, team]. Filled in by
+     * js/schedule.js, which tools/update-schedule.py generates. */
+    GAMES: [],
+
+    /* Who `team` plays on `date` ('YYYY-MM-DD'), or null if nobody. */
+    opponent: function (team, date) {
+      for (var i = 0; i < this.GAMES.length; i++) {
+        var g = this.GAMES[i];
+        if (g[0] !== date) continue;
+        if (g[1] === team) return g[2];
+        if (g[2] === team) return g[1];
+      }
+      return null;
+    }
   };
 })(window);

@@ -121,6 +121,23 @@ already-started leg is cleared and goes back in the list), while tapping a
 finished one corrects who won it or marks it unplayed. After the eighth leg
 it shows the result; 4–4 is a draw.
 
+## Match nights
+
+The app knows the season's fixtures, so on a night your team plays, the setup
+screen opens with both teams already in: yours first, then the opponent. It
+works this out once a day, on the first load; change the list by hand after
+that and it stays changed until tomorrow. On a day with no game, nothing is
+guessed — a fresh device starts with your team alone.
+
+Your team is the starred one in the **Players** picker (**+ Add from players**);
+tap another team's star to make it yours. It ships as Bad News Beers.
+
+The fixtures live in `js/schedule.js`, generated from the league's public
+schedule page by `python3 tools/update-schedule.py`. The app cannot ask that
+site directly — it sends no cross-origin headers, so a browser is refused — which
+is why they are shipped with the build. Run the script again, and rebuild, at the
+start of a season or when the league reschedules.
+
 ## Projector mode
 
 For mirroring the tablet to a projector over Miracast. Miracast always sends a
@@ -289,6 +306,8 @@ js/x01.js           X01 rules and rendering
 js/cricket.js       Cricket rules and rendering
 js/mbc.js           MBC Darts match: leg plan, order, result
 js/league.js        this season's teams, logos and schedule link
+js/schedule.js      every game of the season; generated, see below
+tools/              update-schedule.py regenerates js/schedule.js
 js/projector.js     projector mode: rotated frame host, fullscreen, orientation lock
 js/app.js           setup, persistence, menus, input wiring
 sw.js               offline cache

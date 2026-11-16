@@ -38,7 +38,9 @@
       variant: 'standard', range: 'std', clegs: 1,
       mbcOrder: MBC.ORDER.slice(),
       projector: 0, projectorDir: 'cw',
-      players: ['Bad News Beers', 'Player 2']
+      /* Our team, and the day its line-up was last worked out: see lineUp. */
+      team: League.HOME_TEAM, lineupDay: null,
+      players: [League.HOME_TEAM]
     },
     game: null,
     match: null,   /* an MBC Darts night: App.game is whichever leg is in play */
@@ -148,6 +150,7 @@
       App.detectFlexGap();
       App.debugOverlay();
       App.load();
+      App.lineUp();
       App.syncSetup();
       App.renderPlayers();
       var sched = document.getElementById('schedule-link');
@@ -252,6 +255,46 @@
       App.save();
     },
 
+    /* Today as the schedule writes it, in this device's own time zone. */
+    today: function () {
+      var d = new Date();
+      function two(n) { return (n < 10 ? '0' : '') + n; }
+      return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate());
+    },
+
+    /* Once a day, on the first load: if our team has a game today, the
+     * setup screen opens with the two teams already in, ours first. With no
+     * game today there is no opponent to guess at, so the list is left as
+     * it was -- and a fresh device starts with our team alone. Anything
+     * changed by hand afterwards stands until tomorrow. Not while a game is
+     * in play: Rematch reads this list. */
+    lineUp: function () {
+      var c = App.cfg, today = App.today();
+      if (App.game || c.lineupDay === today) return;
+      c.lineupDay = today;
+      var them = League.opponent(c.team, today);
+      if (them) c.players = [c.team, them];
+      /* Builds before the schedule lookup filled the second slot with a
+       * placeholder; it has no business outliving them. */
+      else c.players = c.players.filter(function (n) { return n !== 'Player 2'; });
+      if (!c.players.length) c.players = [c.team];
+      App.save();
+    },
+
+    /* Make `name` our team: it goes first, with today's opponent if the
+     * schedule has one. */
+    setTeam: function (name) {
+      var c = App.cfg;
+      if (!name || c.team === name) return;
+      c.team = name;
+      c.lineupDay = App.today();
+      var them = League.opponent(name, c.lineupDay);
+      c.players = them ? [name, them]
+        : [name].concat(c.players.filter(function (n) { return n !== name; }));
+      App.renderPlayers();
+      App.save();
+    },
+
     /* A game saved by an older build, resumed mid-play (a deploy reloads
      * open tabs). The scores carry over; what does not is the undo history,
      * whose entries are whole-game snapshots in that build's format, so it
@@ -351,9 +394,7 @@
       document.getElementById('player-list').innerHTML = App.cfg.players.map(function (n, i) {
         return '<li class="prow">' +
           '<span class="prow-n">' + (i + 1) + '</span>' +
-          /* Tapping a loaded team opens the picker, same as the button below. */
-          '<button class="prow-name" data-act="add-player" aria-label="' + UI.esc(n) + ', change players">' +
-            UI.esc(n) + '</button>' +
+          '<button class="prow-name" data-act="rename" data-i="' + i + '">' + UI.esc(n) + '</button>' +
           '<button class="prow-btn" data-act="move-up" data-i="' + i + '"' +
             (i === 0 ? ' disabled' : '') + ' aria-label="Move ' + UI.esc(n) + ' up">&uarr;</button>' +
           '<button class="prow-btn" data-act="move-down" data-i="' + i + '"' +
@@ -383,13 +424,19 @@
       App.save();
     },
 
-    /* Pick from the stored roster. Rows toggle, so several go in at once. */
+    /* Pick from the stored roster. Rows toggle, so several go in at once.
+     * The star on each row makes that team ours: see setTeam. */
     rosterPicker: function () {
       function rows() {
         if (!App.roster.length) return '<p class="empty">The store is empty. Add a name below.</p>';
         return App.roster.map(function (name) {
           var on = App.cfg.players.indexOf(name) !== -1;
+          var ours = App.cfg.team === name;
           return '<div class="rrow-wrap">' +
+            '<button class="rr-team' + (ours ? ' on' : '') + '" data-team="' + UI.esc(name) + '"' +
+              ' aria-pressed="' + ours + '" aria-label="' +
+              (ours ? UI.esc(name) + ' is your team' : 'Make ' + UI.esc(name) + ' your team') + '">' +
+              (ours ? '&#9733;' : '&#9734;') + '</button>' +
             '<button class="rrow' + (on ? ' on' : '') + '" data-pick="' + UI.esc(name) + '"' +
               ' aria-pressed="' + on + '">' +
               '<span class="rr-check">' + (on ? '&#10003;' : '') + '</span>' +
@@ -404,7 +451,9 @@
       UI.modal({
         title: 'Players',
         wide: true,
-        html: '<div class="roster">' + rows() + '</div>',
+        html: '<p class="lg-hint">&#9733; marks your team. It is loaded first, along with ' +
+          'whoever it plays on a match night.</p>' +
+          '<div class="roster">' + rows() + '</div>',
         actions: [
           { label: 'New name', value: 'new' },
           { label: 'Done', value: null, kind: 'primary' }
@@ -414,7 +463,11 @@
           list.addEventListener('click', function (ev) {
             var del = ev.target.closest('[data-del]');
             var pick = ev.target.closest('[data-pick]');
-            if (del) {
+            var team = ev.target.closest('[data-team]');
+            if (team) {
+              App.setTeam(team.dataset.team);
+              UI.buzz(8);
+            } else if (del) {
               var gone = del.dataset.del;
               App.roster = App.roster.filter(function (n) { return n !== gone; });
             } else if (pick) {
@@ -462,6 +515,20 @@
         App.movePlayer(i, -1);
       } else if (act === 'move-down') {
         App.movePlayer(i, 1);
+      } else if (act === 'rename') {
+        UI.prompt('Player name', App.cfg.players[i], 'Name').then(function (name) {
+          if (!name) return;
+          name = name.trim().slice(0, MAX_NAME);
+          /* Players are told apart by name, so two may not share one. */
+          var at = App.cfg.players.indexOf(name);
+          if (at !== -1 && at !== i) {
+            return UI.modal({ title: 'Already playing', html: '<p>' + UI.esc(name) + ' is already in the list.</p>' });
+          }
+          App.cfg.players[i] = name;
+          if (App.roster.indexOf(name) === -1) App.roster.push(name);
+          App.renderPlayers();
+          App.save();
+        });
       } else if (act === 'rm-player') {
         App.cfg.players.splice(i, 1);
         App.renderPlayers();

@@ -11,7 +11,7 @@ var CACHE = 'beer-darts-__BUILD__';
 /* What a first visit stores so the app can start with no signal. Keep in
  * step with the <script> tags in index.html. */
 var ASSETS = ['./', './index.html', './styles.css', './icon.svg', './img/bad-news-beers.png', './manifest.webmanifest',
-  './js/projector.js', './js/league.js', './js/checkout.js', './js/ui.js', './js/x01.js', './js/cricket.js',
+  './js/projector.js', './js/league.js', './js/schedule.js', './js/checkout.js', './js/ui.js', './js/x01.js', './js/cricket.js',
   './js/mbc.js', './js/app.js'];
 
 self.addEventListener('install', function (e) {

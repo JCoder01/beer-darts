@@ -284,6 +284,17 @@ html.js-vh #app { height: var(--app-h); }
   border: 1px solid transparent;
 }
 .rr-del:active { background: var(--red); color: #fff; }
+/* The star that makes a team ours; filled on the one that is. */
+.rr-team {
+  flex: 0 0 auto;
+  width: 38px;
+  border-radius: 10px;
+  color: #4e6076;
+  font-size: 19px;
+  border: 1px solid transparent;
+}
+.rr-team.on { color: var(--amber, #ffc94d); }
+.rr-team:active { background: var(--panel); }
 
 /* ── player cards ──────────────────────────────────────────── */
 .players {
