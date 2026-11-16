@@ -14,10 +14,14 @@
 
   var KEY = 'beerdarts.v1';
   var frame = null;
+  var dir = null;   /* the turn in use, read from storage when it may have changed */
 
   function fsElement() { return document.fullscreenElement || document.webkitFullscreenElement; }
 
   var Projector = {
+    /* Where the app keeps everything; the app takes the name from here. */
+    KEY: KEY,
+
     /* The app running inside the host's frame, rather than as the page. */
     inFrame: (function () {
       try { return !!(global.frameElement && global.frameElement.id === 'pj-frame'); }
@@ -41,7 +45,7 @@
       var s = Projector.read();
       if (Projector.inFrame) {
         var P = global.parent.Projector;
-        return s.on ? P.layout() : P.leave();
+        return s.on ? P.layout(true) : P.leave();
       }
       if (s.on) Projector.enter();
     },
@@ -55,24 +59,32 @@
 
     mount: function () {
       var root = document.documentElement;
+      /* The app that was this page is gone with its DOM; the one in the
+       * frame owns the game and its storage from here on. */
+      if (global.App) global.App.off = true;
+      if (global.UI) global.UI.wakeLock.off();
       root.classList.add('pj-host');
       document.body.innerHTML = '<iframe id="pj-frame" title="Beer Darts" src="index.html' +
         location.search + '" allow="fullscreen; screen-wake-lock"></iframe>';
       frame = document.getElementById('pj-frame');
-      Projector.layout();
-      global.addEventListener('resize', Projector.layout);
+      Projector.layout(true);
+      function relayout() { Projector.layout(); }
+      global.addEventListener('resize', relayout);
       /* Rotating reports the old size if measured straight away. */
-      global.addEventListener('orientationchange', function () { setTimeout(Projector.layout, 120); });
-      if (global.visualViewport) global.visualViewport.addEventListener('resize', Projector.layout);
+      global.addEventListener('orientationchange', function () { setTimeout(relayout, 120); });
+      if (global.visualViewport) global.visualViewport.addEventListener('resize', relayout);
     },
 
     /* Portrait-sized frame turned into the landscape screen, edge to edge.
      * If the screen is portrait anyway (no orientation lock, tablet held
-     * upright), the system has already turned it, so the frame just fills it. */
-    layout: function () {
+     * upright), the system has already turned it, so the frame just fills it.
+     * `reread` when the setting may have changed; a resize has no need to
+     * parse the whole saved game again. */
+    layout: function (reread) {
       if (!frame) return;
+      if (reread || !dir) dir = Projector.read().dir;
       var w = global.innerWidth, h = global.innerHeight, turn = w > h;
-      var deg = Projector.read().dir === 'ccw' ? -90 : 90;
+      var deg = dir === 'ccw' ? -90 : 90;
       frame.style.width = (turn ? h : w) + 'px';
       frame.style.height = (turn ? w : h) + 'px';
       frame.style.transform = 'translate(-50%, -50%)' + (turn ? ' rotate(' + deg + 'deg)' : '');

@@ -261,6 +261,12 @@ To ship a new build, bump the tag in `k8s/kustomization.yaml` and re-apply — t
 `images:` transform rewrites the deployment, and a changed tag is what triggers
 the rollout.
 
+There is no cache version to bump. The image build stamps `sw.js` with a hash of
+every file it ships (the first stage of the `Dockerfile`), so a changed app is a
+changed service worker, and devices that have the app installed pick the new
+build up on their next visit. Served straight from the working tree the stamp is
+left as a placeholder, which is fine: requests are network-first.
+
 ### Caching
 
 Filenames are not content-hashed, so `nginx/default.conf` serves everything
@@ -282,10 +288,11 @@ js/checkout.js      checkout search and ranking, out-mode rules
 js/x01.js           X01 rules and rendering
 js/cricket.js       Cricket rules and rendering
 js/mbc.js           MBC Darts match: leg plan, order, result
+js/league.js        this season's teams, logos and schedule link
 js/projector.js     projector mode: rotated frame host, fullscreen, orientation lock
 js/app.js           setup, persistence, menus, input wiring
 sw.js               offline cache
-Dockerfile          static image, nginx on 8080 as uid 101
+Dockerfile          static image, nginx on 8080 as uid 101; stamps sw.js with the build
 nginx/default.conf  MIME types, caching and security headers
 k8s/                deployment, service, Traefik ingress, kustomization
 ```

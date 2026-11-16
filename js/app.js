@@ -2,42 +2,17 @@
 (function (global) {
   'use strict';
 
-  var KEY = 'beerdarts.v1';
+  var KEY = Projector.KEY;
+  /* Bump whenever the shape of a saved *game* changes, and teach
+   * App.adoptOldGame what the older shape needs before it can be resumed. */
+  var SAVE_VERSION = 2;
   var MAX_NAME = 24;
 
-  /* The league's teams, spelled exactly as the schedule spells them. Bump
-   * SEASON when this changes: a device that already stored the old list
-   * swaps it for this one on its next load, keeping any names added by hand. */
-  var SEASON = '2026-fall';
-  var SEED_ROSTER = [
-    'Bad News Beers',
-    'Boston Brits',
-    "Boys who Don't read good",
-    'BullsHitters',
-    'Dart Siders',
-    'Darts and Rec.',
-    'Darty Dancin’',
-    'Därtley Crüe',
-    'Duck',
-    'Flight Club.',
-    'Good Grouping!',
-    'Jammie Dodgers',
-    'Medford Misfits',
-    'Mrs Turner',
-    'Projectile Dysfunction',
-    'Somervillains',
-    'Teenage Dartbags',
-    'The Sharts',
-    'Villain Cruisers',
-    'Who Darted?'
-  ];
-
-  /* Every earlier season's built-in names, so they can be told apart from
-   * names a player typed in, and renames that should follow a team across. */
-  var PAST_SEEDS = [
-    'Minute Man Militia', 'MENACE', "At least We're Cute", 'Jammy Dodgers'
-  ];
-  var RENAMED = { 'Jammy Dodgers': 'Jammie Dodgers' };
+  /* The season's teams and their history: see js/league.js. */
+  var SEASON = League.SEASON;
+  var SEED_ROSTER = League.TEAMS;
+  var PAST_SEEDS = League.PAST_TEAMS;
+  var RENAMED = League.RENAMED;
 
   /* What each named shortcut actually throws. A breakfast is definitionally
    * 20-5-1; 41 has no canonical throw, so it uses the common 20-20-1. */
@@ -175,6 +150,8 @@
       App.load();
       App.syncSetup();
       App.renderPlayers();
+      var sched = document.getElementById('schedule-link');
+      if (League.SCHEDULE_URL) sched.href = League.SCHEDULE_URL; else sched.hidden = true;
 
       document.getElementById('screen-setup').addEventListener('click', App.onSetupClick);
       var x01 = document.getElementById('screen-x01');
@@ -203,8 +180,21 @@
        * a stray drag can shift the whole layout by a few dozen pixels, so
        * the next tap lands on the wrong element. Block scrolling everywhere
        * except the few places that are meant to scroll. */
+      var drag = null;
+      document.addEventListener('touchstart', function (e) {
+        drag = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+      }, { passive: true });
       document.addEventListener('touchmove', function (e) {
-        if (e.target.closest && e.target.closest('.scroll, .roster, .modal')) return;
+        var t = e.target;
+        if (!t.closest) return e.preventDefault();
+        if (t.closest('.scroll, .roster, .modal')) return;
+        /* The player strip scrolls sideways once the cards outgrow it, and
+         * only sideways: a drag that is mostly vertical is still blocked. */
+        var strip = t.closest('.players');
+        if (strip && drag && strip.scrollWidth > strip.clientWidth) {
+          var pt = e.touches[0];
+          if (Math.abs(pt.clientX - drag.x) > Math.abs(pt.clientY - drag.y)) return;
+        }
         e.preventDefault();
       }, { passive: false });
 
@@ -235,7 +225,10 @@
         if (!raw) return;
         var d = JSON.parse(raw);
         if (d.cfg) Object.keys(d.cfg).forEach(function (k) { App.cfg[k] = d.cfg[k]; });
-        if (d.game && d.game.players && d.game.players.length) App.game = d.game;
+        if (d.game && d.game.players && d.game.players.length) {
+          App.game = d.game;
+          if (d.v !== SAVE_VERSION) App.adoptOldGame(App.game);
+        }
         if (App.game && d.match && d.match.legs) App.match = d.match;
         if (!MBC.validOrder(App.cfg.mbcOrder)) App.cfg.mbcOrder = MBC.ORDER.slice();
         if (d.roster && d.roster.length) {
@@ -259,11 +252,24 @@
       App.save();
     },
 
+    /* A game saved by an older build, resumed mid-play (a deploy reloads
+     * open tabs). The scores carry over; what does not is the undo history,
+     * whose entries are whole-game snapshots in that build's format, so it
+     * is given up rather than replayed into the wrong shape. Fields added
+     * since are filled in. */
+    adoptOldGame: function (g) {
+      g.history = [];
+      if (!g.rounds) g.rounds = [];
+      if (g.type === 'cricket' && !g.log) g.log = [];
+      if (g.type === 'x01' && !g.fire) g.fire = 0;
+      delete g.matchLegs;   /* once kept on the game; now handed to render */
+    },
+
     save: function () {
       if (App.off) return;   /* the projector host: the frame owns storage */
       try {
         localStorage.setItem(KEY, JSON.stringify({
-          cfg: App.cfg, game: App.game, match: App.match, roster: App.roster, season: SEASON
+          v: SAVE_VERSION, cfg: App.cfg, game: App.game, match: App.match, roster: App.roster, season: SEASON
         }));
       } catch (e) { /* private mode / quota: play on without persistence */ }
     },
@@ -280,17 +286,8 @@
     START_MAX: 1001,
 
     customStart: function () {
-      UI.prompt('Starting score', String(App.cfg.start), App.START_MIN + '–' + App.START_MAX,
-        { numeric: true, min: App.START_MIN, max: App.START_MAX }
-      ).then(function (val) {
-        if (val === null) return;
-        var n = parseInt(val, 10);
-        if (!/^\d+$/.test(val) || isNaN(n) || n < App.START_MIN || n > App.START_MAX) {
-          return UI.modal({
-            title: 'Out of range',
-            html: '<p>Pick a whole number from ' + App.START_MIN + ' to ' + App.START_MAX + '.</p>'
-          }).then(App.customStart);
-        }
+      UI.promptNumber('Starting score', App.cfg.start, App.START_MIN, App.START_MAX).then(function (n) {
+        if (n === null) return;
         App.cfg.start = n;
         App.syncSetup();
         App.save();
@@ -354,7 +351,9 @@
       document.getElementById('player-list').innerHTML = App.cfg.players.map(function (n, i) {
         return '<li class="prow">' +
           '<span class="prow-n">' + (i + 1) + '</span>' +
-          '<button class="prow-name" data-act="rename" data-i="' + i + '">' + UI.esc(n) + '</button>' +
+          /* Tapping a loaded team opens the picker, same as the button below. */
+          '<button class="prow-name" data-act="add-player" aria-label="' + UI.esc(n) + ', change players">' +
+            UI.esc(n) + '</button>' +
           '<button class="prow-btn" data-act="move-up" data-i="' + i + '"' +
             (i === 0 ? ' disabled' : '') + ' aria-label="Move ' + UI.esc(n) + ' up">&uarr;</button>' +
           '<button class="prow-btn" data-act="move-down" data-i="' + i + '"' +
@@ -463,13 +462,6 @@
         App.movePlayer(i, -1);
       } else if (act === 'move-down') {
         App.movePlayer(i, 1);
-      } else if (act === 'rename') {
-        UI.prompt('Player name', App.cfg.players[i], 'Name').then(function (name) {
-          if (!name) return;
-          App.cfg.players[i] = name.trim().slice(0, MAX_NAME);
-          App.renderPlayers();
-          App.save();
-        });
       } else if (act === 'rm-player') {
         App.cfg.players.splice(i, 1);
         App.renderPlayers();
@@ -552,22 +544,29 @@
     /* game loop ------------------------------------------------ */
     mod: function () { return App.game.type === 'x01' ? X01 : Cricket; },
 
+    /* The one step after any change to the game: settle what follows from
+     * it, draw, save, and raise a win that nobody has been told about. */
     render: function () {
       var g = App.game;
+      /* A won leg's point counts from now, so the cards behind the win
+       * modal already show it; Undo there takes it back off. */
+      if (App.match && g.announce) App.match.legs[App.match.cur].winner = g.announce.player;
+      App.draw();
+      App.save();
+      if (g.announce && !App.announcing) App.announce();
+    },
+
+    /* Put the game on screen. Nothing here changes it. */
+    draw: function () {
+      var g = App.game;
       var host = document.getElementById('screen-' + g.type);
-      if (App.match) {
-        /* A won leg's point counts from now, so the cards behind the win
-         * modal already show it; Undo there takes it back off. */
-        if (g.announce) App.match.legs[App.match.cur].winner = g.announce.player;
-        g.matchLegs = MBC.score(App.match);
-      }
 
       /* The screen is re-rendered wholesale after every dart, which would
        * otherwise throw the player strip back to the left on each throw. */
       var old = host.querySelector('.players');
       var left = old ? old.scrollLeft : 0;
 
-      host.innerHTML = App.mod().render(g);
+      host.innerHTML = App.mod().render(g, { matchLegs: App.match ? MBC.score(App.match) : null });
       host.classList.toggle('diddling', !!g.diddle);
 
       var strip = host.querySelector('.players');
@@ -580,23 +579,25 @@
           else if (r > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = r - strip.clientWidth + 8;
         }
       }
-
-      App.save();
-      if (g.announce) App.announce();
     },
 
     undo: function () {
       App.game = App.mod().undo(App.game);
-      if (App.game.type === 'x01') X01.clearPending(App.game);   /* never restore a half-typed total */
       UI.buzz(10);
       App.render();
     },
 
+    /* g.announce stays on the game until the win is acted on -- next leg,
+     * undo, a new game -- so a reload at any point brings the modal back.
+     * App.announcing is only "that modal is up now", so render() does not
+     * raise it twice. */
+    announcing: false,
+
     announce: function () {
       var g = App.game;
       var a = g.announce;
-      g.announce = null;
       var p = g.players[a.player];
+      App.announcing = true;
 
       var stats;
       if (g.type === 'x01') {
@@ -625,6 +626,7 @@
         actions: actions,
         dismissible: false
       }).then(function (v) {
+        App.announcing = false;
         if (v === 'undo') return App.undo();
         if (v === 'next') { App.mod().nextLeg(App.game); return App.render(); }
         if (v === 'rematch') { App.start(); return; }
@@ -653,16 +655,18 @@
         actions: actions,
         dismissible: false
       }).then(function (v) {
-        if (v === 'undo') { m.legs[m.cur].winner = null; return App.undo(); }
-        if (v === 'next') return App.playLeg(nx);
         if (v === 'pick') {
-          /* Closing the match screen without starting anything comes back here. */
+          /* Still the same win being dealt with, so `announcing` holds until
+           * the match screen is done. Closing it without starting anything
+           * comes back here. */
           return App.matchScreen().then(function (moved) {
-            if (moved || !App.game || !App.match) return;
-            App.game.announce = a;
-            App.announce();
+            App.announcing = false;
+            if (!moved && App.game && App.match) App.announce();
           });
         }
+        App.announcing = false;
+        if (v === 'undo') { m.legs[m.cur].winner = null; return App.undo(); }
+        if (v === 'next') return App.playLeg(nx);
         App.endMatch();
       });
     },
@@ -688,7 +692,7 @@
     /* Resolves true once it has moved play on (a new leg, or the match
      * ended), false if it was closed with play left where it was. */
     matchScreen: function () {
-      var m = App.match, picked = null, s = MBC.score(m);
+      var m = App.match, s = MBC.score(m);
       return UI.modal({
         title: 'Match',
         wide: true,
@@ -701,12 +705,12 @@
           { label: 'End match', value: 'end', kind: 'danger' },
           { label: 'Close', value: null, kind: 'primary' }
         ],
-        onOpen: function (w) {
+        onOpen: function (w, close) {
           w.querySelector('.mbc-rows').addEventListener('click', function (ev) {
             var r = ev.target.closest('[data-leg]');
             if (!r) return;
-            picked = +r.dataset.leg;
-            w.querySelector('.modal-actions .btn.primary').click();
+            UI.buzz(10);
+            close(+r.dataset.leg);   /* a number: the leg that was tapped */
           });
         }
       }).then(function (v) {
@@ -721,8 +725,8 @@
             return true;
           });
         }
-        if (picked == null) return false;
-        var leg = m.legs[picked];
+        if (typeof v !== 'number') return false;
+        var picked = v, leg = m.legs[picked];
 
         if (leg.winner != null) {
           return UI.modal({
@@ -742,7 +746,7 @@
         /* Leaving a leg part-thrown loses its scores; say so first. */
         var g = App.game;
         var started = g && !g.over && m.legs[m.cur].winner == null &&
-          (g.history.length || (g.rounds && g.rounds.length));
+          (g.history.length || g.rounds.length);
         if (!started) return App.playLeg(picked);
         return UI.modal({
           title: 'Play ' + leg.name + ' now?',
@@ -790,17 +794,20 @@
       if (act === 'miss') { X01.throwDart(g, 0, 1, 'MISS'); return App.render(); }
 
       /* Both expand into real darts, so busts and checkouts still apply. Stop
-       * the moment the turn ends, or the rest would land on the next player. */
+       * the moment the turn ends, or the rest would land on the next turn.
+       * endTurn swaps in a fresh turn object, which is the reliable signal:
+       * in a one-player game `cur` never changes. A leg won mid-expansion
+       * (g.announce) ends it too. */
       if (SLANG_DARTS[act]) {
-        var who = g.cur;
+        var turn = g.turn;
         var darts = SLANG_DARTS[act];
         for (var d = 0; d < darts.length; d++) {
-          if (g.over || g.cur !== who || X01.dartsLeft(g) < 1) break;
+          if (g.over || g.announce || g.turn !== turn || X01.dartsLeft(g) < 1) break;
           X01.throwDart(g, darts[d][0], darts[d][1], darts[d][2]);
         }
         return App.render();
       }
-      if (act === 'endturn') { X01.snapshot(g); X01.endTurn(g, false); return App.render(); }
+      if (act === 'endturn') { X01.endEarly(g); return App.render(); }
 
       if (act === 'dig') { X01.typeDigit(g, v); return App.render(); }
       if (act === 'back') { X01.backspace(g); return App.render(); }
@@ -809,7 +816,7 @@
         if (!X01.addFire(g, v)) { UI.toast('That would be over 180'); return; }
         return App.render();
       }
-      if (act === 'quick') { X01.clearPending(g); g.pending = String(v); return App.submitTotal(); }
+      if (act === 'quick') { X01.setPending(g, v); return App.submitTotal(); }
       if (act === 'enter') return App.submitTotal();
     },
 
@@ -818,10 +825,11 @@
       if (!X01.hasPending(g)) return;
       var total = X01.pendingTotal(g);
 
-      if (Checkout.impossibleTotal(total)) {
+      var err = X01.totalError(g, total);
+      if (err) {
         X01.clearPending(g);
         App.render();
-        return UI.modal({ title: 'Not possible', html: '<p>No three darts make ' + total + '.</p>' });
+        return UI.modal({ title: 'Not possible', html: '<p>' + UI.esc(err) + '</p>' });
       }
 
       /* A checkout needs the real dart count for the average to mean anything. */
@@ -852,8 +860,8 @@
       if (act === 'menu') return App.menu();
       if (act === 'undo') return App.undo();
       if (act === 'ledger') return App.ledger();
-      /* Corrections stay reachable after the game ends -- undoing the
-       * closing mark is exactly when you'd want them. */
+      /* Leaving correction mode and taking a mark back are not plays, so
+       * they are not held to the "game is over" gate below. */
       if (act === 'editdone') { g.editing = null; return App.render(); }
       if (act === 'undocell') { Cricket.undoMark(g, +b.dataset.p, +b.dataset.t); return App.render(); }
       if (g.over) return;
@@ -891,7 +899,7 @@
         if (e.touches.length !== 1) return;
         pt = e.touches[0];
       }
-      if (!App.game || document.querySelector('.backdrop')) return;
+      if (!App.game || UI.modalOpen()) return;
       clearTimeout(App.lpTimer);
       App.lp = { x: pt.clientX, y: pt.clientY, target: e.target, fired: false };
       App.lpTimer = setTimeout(function () {
@@ -944,23 +952,11 @@
       var g = App.game;
       if (!g || g.type !== 'x01') return;
       var p = g.players[i];
-      UI.prompt('Score for ' + p.name, String(p.score), '0–' + g.start,
-        { numeric: true, min: 0, max: g.start }
-      ).then(function (val) {
-        if (val === null) return;
-        var n = parseInt(val, 10);
-        if (!/^\d+$/.test(val) || isNaN(n) || n < 0 || n > g.start) {
-          return UI.modal({
-            title: 'Out of range',
-            html: '<p>Pick a whole number from 0 to ' + g.start + '.</p>'
-          }).then(function () { App.editScore(i); });
-        }
-        X01.snapshot(g);
-        (g.rounds = g.rounds || []).push({ p: i, leg: g.leg, edit: true, left: n });
-        p.score = n;
-        if (n < g.start) p.opened = true;   /* they've clearly scored, so double-in is done */
-        if (i === g.cur) g.turn = { darts: [], start: n };   /* the in-progress turn's baseline moved */
-        g.flash = null;
+      /* Not 0, and not 1 unless straight out: a correction cannot win the
+       * leg, and a score with no finish would bust on every dart after. */
+      UI.promptNumber('Score for ' + p.name, p.score, X01.minScore(g), g.start).then(function (n) {
+        if (n === null) return;
+        X01.setScore(g, i, n);
         App.render();
       });
     },
@@ -970,15 +966,8 @@
     setEntry: function (mode) {
       var g = App.game;
       if (!g || g.type !== 'x01' || g.entry === mode) return;
-      g.entry = mode;
+      App.game = X01.setEntry(g, mode);
       App.cfg.entry = mode;
-      /* A part-thrown turn cannot be carried across entry modes. */
-      if (g.turn.darts.length) {
-        g.players[g.cur].score = g.turn.start;
-        g.turn = { darts: [], start: g.turn.start };
-      }
-      X01.clearPending(g);
-      g.mult = 1;
       UI.buzz(16);
       App.render();
       UI.toast(App.ENTRY_NAME[mode]);
@@ -1010,7 +999,7 @@
 
     /* keyboard (handy when scoring from a laptop) --------------- */
     onKey: function (e) {
-      if (App.off || !App.game || document.querySelector('.backdrop')) return;
+      if (App.off || !App.game || UI.modalOpen()) return;
       var g = App.game;
       if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); return App.undo(); }
       if (g.type !== 'x01' || g.entry !== 'total' || g.over || g.diddle) return;
@@ -1031,8 +1020,7 @@
     /* Opens scrolled to the bottom, where the latest visit is. */
     ledger: function (keepScroll) {
       var g = App.game;
-      /* Cricket corrections stay open after the game ends; X01 edits do not. */
-      var hint = !(g.rounds && g.rounds.length) ? ''
+      var hint = !g.rounds.length ? ''
         : g.type === 'cricket' ? '<p class="lg-hint">Tap a number in this leg to take back one of those marks.</p>'
         : g.over ? '' : '<p class="lg-hint">Tap a round in this leg to change its score.</p>';
       UI.modal({
@@ -1040,14 +1028,15 @@
         wide: true,
         html: hint + App.mod().ledgerHtml(g),
         actions: [{ label: 'Close', value: null, kind: 'primary' }],
-        onOpen: function (wrap) {
+        onOpen: function (wrap, close) {
           var m = wrap.querySelector('.modal');
           m.scrollTop = keepScroll != null ? keepScroll : m.scrollHeight;
           m.addEventListener('click', function (ev) {
             var cell = ev.target.closest('[data-ri], [data-cp]');
             if (!cell) return;
             var top = m.scrollTop;
-            m.parentElement.querySelector('.modal-actions .btn').click();   /* close, then edit */
+            UI.buzz(10);
+            close(null);   /* close, then edit */
             if (cell.dataset.ri != null) App.editRound(+cell.dataset.ri, top);
             else App.takeBack(+cell.dataset.cp, +cell.dataset.ct, top);
           });
@@ -1059,15 +1048,8 @@
     editRound: function (ri, top) {
       var g = App.game, row = g.rounds[ri];
       var pl = g.players[row.p];
-      UI.prompt('Change ' + pl.name + '’s score', row.bust ? '' : String(row.scored), '0–180',
-        { numeric: true, min: 0, max: 180 }
-      ).then(function (val) {
-        if (val === null) return App.ledger(top);
-        var n = parseInt(val, 10);
-        if (!/^\d+$/.test(val) || n > 180) {
-          return UI.modal({ title: 'Out of range', html: '<p>Pick a whole number from 0 to 180.</p>' })
-            .then(function () { App.editRound(ri, top); });
-        }
+      UI.promptNumber('Change ' + pl.name + '’s score', row.bust ? '' : row.scored, 0, 180).then(function (n) {
+        if (n === null) return App.ledger(top);
         var err = X01.editRound(g, ri, n);
         if (err) {
           return UI.modal({ title: 'Can’t change that', html: '<p>' + UI.esc(err) + '</p>' })
@@ -1122,12 +1104,7 @@
             actions: [{ label: 'Cancel', value: false }, { label: 'Restart', value: true, kind: 'danger' }]
           }).then(function (ok) {
             if (!ok) return;
-            var mod = App.mod();
-            mod.nextLeg(g);
-            g.leg--;                                   /* a restart is not a new leg */
-            g.legStarter = (g.legStarter - 1 + g.players.length) % g.players.length;
-            g.cur = g.legStarter;
-            if (g.rounds) g.rounds = g.rounds.filter(function (r) { return r.leg !== g.leg; });
+            App.mod().restartLeg(App.game);
             App.render();
           });
         }

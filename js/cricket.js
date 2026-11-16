@@ -11,8 +11,6 @@
   function label(t) { return t === 25 ? 'BULL' : String(t); }
 
   var Cricket = {
-    RANGES: RANGES,
-
     create: function (cfg) {
       var targets = RANGES[cfg.range] || RANGES.std;
       return {
@@ -43,20 +41,40 @@
     },
 
     /* history -------------------------------------------------- */
-    snapshot: function (g) {
-      var h = g.history;
+    /* The mark log and the ledger are left out of the snapshot: both only
+     * ever grow, so copying them into every entry made the saved game
+     * quadratic in the number of marks. Each entry instead records how to
+     * put them back. The ledger is append-only, so its length is enough.
+     * For the log, `readd` is { at, entry } when the step being recorded is
+     * a take-back that removes a mark; without it the step appends one mark,
+     * so undo drops the last. */
+    snapshot: function (g, readd) {
+      var h = g.history, log = g.log, rounds = g.rounds;
       g.history = [];
-      var s = JSON.stringify(g);
+      g.log = [];
+      g.rounds = [];
+      var s = JSON.stringify({ g: g, readd: readd || null, rounds: rounds.length });
       g.history = h;
+      g.log = log;
+      g.rounds = rounds;
       h.push(s);
       if (h.length > 300) h.shift();
     },
 
+    /* Undo rolls back the marks, not the screen: a column left in (or out
+     * of) correction mode stays that way. */
     undo: function (g) {
       if (!g.history.length) return g;
-      var h = g.history;
-      var ng = JSON.parse(h.pop());
+      var h = g.history, log = g.log, rounds = g.rounds;
+      var snap = JSON.parse(h.pop());
+      if (snap.readd) log.splice(snap.readd.at, 0, snap.readd.entry);
+      else log.pop();
+      rounds.length = Math.min(rounds.length, snap.rounds);
+      var ng = snap.g;
       ng.history = h;
+      ng.log = log;
+      ng.rounds = rounds;
+      ng.editing = g.editing;
       return ng;
     },
 
@@ -103,7 +121,7 @@
       }
 
       g.log.push({ p: i, t: target, pts: pts, to: to });
-      (g.rounds = g.rounds || []).push({ p: i, t: target, pts: pts, to: to, leg: g.leg });
+      g.rounds.push({ p: i, t: target, pts: pts, to: to, leg: g.leg });
       g.cur = i;
       g.flash = { name: p.name, label: label(target), pts: pts };
       Cricket.checkWin(g, i);
@@ -123,10 +141,11 @@
       }
       if (idx === -1) return false;
 
-      Cricket.snapshot(g);   /* so the top-bar undo can reverse this correction */
+      /* so the top-bar undo can reverse this correction */
+      Cricket.snapshot(g, { at: idx, entry: g.log[idx] });
       var entry = g.log.splice(idx, 1)[0];
       entry.to.forEach(function (j) { g.players[j].score -= entry.pts; });
-      (g.rounds = g.rounds || []).push({ p: i, t: t, pts: entry.pts, to: entry.to, leg: g.leg, undo: true });
+      g.rounds.push({ p: i, t: t, pts: entry.pts, to: entry.to, leg: g.leg, undo: true });
 
       var left = 0;
       for (var m = 0; m < g.log.length; m++) {
@@ -134,11 +153,30 @@
       }
       g.players[i].marks[t] = Math.min(3, left);
 
-      /* Undoing the mark that closed someone out can un-finish the game. */
-      if (g.over && (g.winner == null || !Cricket.closedAll(g, g.players[g.winner]))) {
+      g.flash = { name: g.players[i].name, label: '−' + label(t), pts: 0 };
+
+      /* A take-back moves marks and points, so it can decide the leg as
+       * surely as a mark can: un-finish a game whose winner no longer
+       * stands, then see whether the board as it is now has a winner. */
+      if (g.over && !Cricket.wins(g, g.winner)) {
+        g.players[g.winner].legs--;
         g.over = false; g.winner = null; g.announce = null;
       }
-      g.flash = { name: g.players[i].name, label: '−' + label(t), pts: 0 };
+      if (!g.over && !g.announce) Cricket.checkWin(g, g.cur);
+      return true;
+    },
+
+    /* Has player i won the leg as the board stands? Everything closed, and
+     * on points nobody ahead (standard) or nobody below (cutthroat). */
+    wins: function (g, i) {
+      var p = g.players[i];
+      if (!p || !Cricket.closedAll(g, p)) return false;
+      if (g.variant === 'standard') {
+        return g.players.every(function (o, j) { return j === i || p.score >= o.score; });
+      }
+      if (g.variant === 'cutthroat') {
+        return g.players.every(function (o, j) { return j === i || p.score <= o.score; });
+      }
       return true;
     },
 
@@ -148,15 +186,7 @@
       var order = [actingIndex].concat(g.players.map(function (_, i) { return i; }));
       for (var k = 0; k < order.length; k++) {
         var i = order[k], p = g.players[i];
-        if (!Cricket.closedAll(g, p)) continue;
-
-        var ok = true;
-        if (g.variant === 'standard') {
-          ok = g.players.every(function (o, j) { return j === i || p.score >= o.score; });
-        } else if (g.variant === 'cutthroat') {
-          ok = g.players.every(function (o, j) { return j === i || p.score <= o.score; });
-        }
-        if (!ok) continue;
+        if (!Cricket.wins(g, i)) continue;
 
         p.legs++;
         if (p.legs >= g.legsToWin) { g.over = true; g.winner = i; }
@@ -169,6 +199,16 @@
     nextLeg: function (g) {
       g.leg++;
       g.legStarter = (g.legStarter + 1) % g.players.length;
+      Cricket.resetLeg(g);
+    },
+
+    /* Play the current leg again from the top; its marks leave the ledger. */
+    restartLeg: function (g) {
+      g.rounds = g.rounds.filter(function (r) { return r.leg !== g.leg; });
+      Cricket.resetLeg(g);
+    },
+
+    resetLeg: function (g) {
       g.cur = g.legStarter;
       g.players.forEach(function (p) {
         g.targets.forEach(function (t) { p.marks[t] = 0; });
@@ -186,7 +226,7 @@
      * other team marked in between -- which is what a visit looks like at
      * the board. Take-backs get rows of their own. */
     ledgerHtml: function (g) {
-      var e = UI.esc, rows = g.rounds || [], html = '', leg;
+      var e = UI.esc, rows = g.rounds, html = '', leg;
       var scoring = g.variant !== 'noscore';
       if (!rows.length) return '<p>No marks yet.</p>';
 
@@ -251,9 +291,11 @@
     },
 
     /* render --------------------------------------------------- */
-    render: function (g) {
+    /* `view.matchLegs`: an MBC match's points per team, shown for legs won. */
+    render: function (g, view) {
       var e = UI.esc;
       var n = g.players.length;
+      var matchLegs = view && view.matchLegs;
 
       var header =
         '<header class="topbar">' +
@@ -306,7 +348,7 @@
           (g.variant === 'noscore'
             ? ''
             : '<div class="ch-score">' + p.score + '</div>') +
-          (g.matchLegs ? '<div class="ch-legs">legs ' + g.matchLegs[i] + '</div>'
+          (matchLegs ? '<div class="ch-legs">legs ' + matchLegs[i] + '</div>'
             : g.legsToWin > 1 ? '<div class="ch-legs">legs ' + p.legs + '</div>' : '') +
         '</div>';
       }

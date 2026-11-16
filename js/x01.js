@@ -46,21 +46,70 @@
     },
 
     /* history -------------------------------------------------- */
-    snapshot: function (g) {
-      var h = g.history;
+    /* The ledger (g.rounds) is left out of the snapshot: it grows for the
+     * whole match, so copying it into every entry made the saved game
+     * quadratic in the number of visits. Rows are only ever appended, so its
+     * length is enough to roll it back -- except for editRound, which
+     * rewrites rows in place and passes their indices as `touched` so the
+     * originals ride along in the entry. */
+    snapshot: function (g, touched) {
+      var h = g.history, rounds = g.rounds;
+      var rows = (touched || []).map(function (k) { return [k, rounds[k]]; });
       g.history = [];
-      var s = JSON.stringify(g);
+      g.rounds = [];
+      var s = JSON.stringify({ g: g, rounds: rounds.length, rows: rows });
       g.history = h;
+      g.rounds = rounds;
       h.push(s);
       if (h.length > 300) h.shift();
     },
 
+    /* Undo rolls back the play, not how it is being entered: the entry mode
+     * stays as it is now, and a half-typed total is never brought back. */
     undo: function (g) {
       if (!g.history.length) return g;
-      var h = g.history;
-      var ng = JSON.parse(h.pop());
+      var h = g.history, rounds = g.rounds, ng;
+      function restore(kr) { rounds[kr[0]] = kr[1]; }
+      do {
+        var snap = JSON.parse(h.pop());
+        rounds.length = Math.min(rounds.length, snap.rounds);
+        snap.rows.forEach(restore);
+        ng = snap.g;
+        /* A step back into the middle of a dart-by-dart turn has nowhere to
+         * go in 3-dart total, so carry on to the start of that turn. */
+      } while (ng.entry !== g.entry && ng.turn.darts.length && h.length);
+      if (ng.entry !== g.entry) X01.dropTurn(ng);
+      ng.entry = g.entry;
+      X01.clearPending(ng);
       ng.history = h;
+      ng.rounds = rounds;
       return ng;
+    },
+
+    /* Throw away the darts of the turn in progress, score and all. */
+    dropTurn: function (g) {
+      if (!g.turn.darts.length) return;
+      g.players[g.cur].score = g.turn.start;
+      g.turn = { darts: [], start: g.turn.start };
+    },
+
+    /* Change how visits are entered. A part-thrown turn cannot be carried
+     * across, so it is taken back dart by dart first -- through undo, so
+     * the history no longer holds darts that are not on the board. Only
+     * while the newest entry *is* this turn's last dart: a ledger correction
+     * made mid-turn is not ours to undo. Returns the game, which like undo's
+     * may be a new object. */
+    setEntry: function (g, mode) {
+      function topIsLastDart() {
+        var top = JSON.parse(g.history[g.history.length - 1]).g;
+        return top.cur === g.cur && top.turn.darts.length === g.turn.darts.length - 1;
+      }
+      while (g.turn.darts.length && g.history.length && topIsLastDart()) g = X01.undo(g);
+      X01.dropTurn(g);
+      g.entry = mode;
+      X01.clearPending(g);
+      g.mult = 1;
+      return g;
     },
 
     /* play ----------------------------------------------------- */
@@ -69,14 +118,16 @@
     /* 3-dart total entry: typed digits, plus any 🔥 (a treble 20 each) put
      * in front of them, so a visit like T20 T20 1 is 🔥🔥 then 1. The visit
      * is their sum, and nothing typed may push it past 180. */
-    pendingTotal: function (g) { return (g.fire || 0) * 60 + (+g.pending || 0); },
-    hasPending: function (g) { return g.pending !== '' || (g.fire || 0) > 0; },
+    pendingTotal: function (g) { return g.fire * 60 + (+g.pending || 0); },
+    hasPending: function (g) { return g.pending !== '' || g.fire > 0; },
     clearPending: function (g) { g.pending = ''; g.fire = 0; },
+    /* A whole visit in one tap, replacing anything typed so far. */
+    setPending: function (g, total) { g.fire = 0; g.pending = String(total); },
 
     typeDigit: function (g, d) {
       if (g.pending.length >= 3) return;
       var next = (g.pending + d).replace(/^0+(?=\d)/, '');
-      if ((g.fire || 0) * 60 + +next <= 180) g.pending = next;
+      if (g.fire * 60 + +next <= 180) g.pending = next;
     },
 
     backspace: function (g) {
@@ -86,8 +137,8 @@
 
     /* Returns false when the fires would not fit -- 🔥🔥 on top of 61, say. */
     addFire: function (g, n) {
-      if ((g.fire || 0) + n > 2 || X01.pendingTotal(g) + n * 60 > 180) return false;
-      g.fire = (g.fire || 0) + n;
+      if (g.fire + n > 2 || X01.pendingTotal(g) + n * 60 > 180) return false;
+      g.fire += n;
       return true;
     },
 
@@ -127,11 +178,29 @@
       if (X01.dartsLeft(g) === 0) X01.endTurn(g, false);
     },
 
-    /* 3-dart total entry. `darts` is how many were really thrown on a checkout. */
+    /* Why a 3-dart total cannot be entered, or null if it can. A total that
+     * takes the score to zero has to be a real finish for the out mode -- 159
+     * on double out is not. A player still waiting on their double in is not
+     * checked: the finder does not model the opening double. */
+    totalError: function (g, total) {
+      if (Checkout.impossibleTotal(total)) return 'No three darts make ' + total + '.';
+      var p = g.players[g.cur];
+      if (p.score - total === 0 && p.opened && !Checkout.possible(p.score, 3, g.outMode)) {
+        return 'There is no ' + MODE_NAME[g.outMode].toLowerCase() + ' finish from ' + p.score + '.';
+      }
+      return null;
+    },
+
+    /* The lowest score a player can be left on and still finish. */
+    minScore: function (g) { return g.outMode === 'straight' ? 1 : 2; },
+
+    /* 3-dart total entry. `darts` is how many were really thrown on a checkout.
+     * Returns the reason it was refused, or null once it is applied. */
     enterTotal: function (g, total, darts) {
       if (g.over) return null;
       var p = g.players[g.cur];
-      if (Checkout.impossibleTotal(total)) return 'No three darts make ' + total + '.';
+      var err = X01.totalError(g, total);
+      if (err) return err;
 
       var nr = p.score - total;
       var bust = nr < 0 || (nr === 1 && g.outMode !== 'straight');
@@ -155,7 +224,7 @@
     log: function (g, row) {
       row.p = g.cur;
       row.leg = g.leg;
-      (g.rounds = g.rounds || []).push(row);
+      g.rounds.push(row);
     },
 
     dartLabels: function (g) {
@@ -183,6 +252,25 @@
       X01.clearPending(g);
     },
 
+    /* END: finish the turn with fewer than three darts thrown. */
+    endEarly: function (g) {
+      if (g.over || !g.turn.darts.length) return;
+      X01.snapshot(g);
+      X01.endTurn(g, false);
+    },
+
+    /* A correction typed straight in. It is not a visit, so it scores
+     * nothing and leaves the averages alone; the ledger shows it as an edit. */
+    setScore: function (g, i, n) {
+      var p = g.players[i];
+      X01.snapshot(g);
+      g.rounds.push({ p: i, leg: g.leg, edit: true, left: n });
+      p.score = n;
+      if (n < g.start) p.opened = true;   /* they've clearly scored, so double-in is done */
+      if (i === g.cur) g.turn = { darts: [], start: n };   /* the in-progress turn's baseline moved */
+      g.flash = null;
+    },
+
     winLeg: function (g, dartCount) {
       var p = g.players[g.cur];
       var thrown = dartCount != null ? dartCount : g.turn.darts.length;
@@ -201,6 +289,31 @@
     nextLeg: function (g) {
       g.leg++;
       g.legStarter = (g.legStarter + 1) % g.players.length;
+      X01.resetLeg(g);
+    },
+
+    /* Play the current leg again from the top, as if it had not been
+     * started: its visits leave the ledger, and the averages with them. */
+    restartLeg: function (g) {
+      g.rounds = g.rounds.filter(function (r) {
+        if (r.leg !== g.leg) return true;
+        if (!r.edit) {
+          var p = g.players[r.p];
+          p.darts = Math.max(0, p.darts - r.n);
+          p.scored = Math.max(0, p.scored - r.scored);
+        }
+        return false;
+      });
+      g.players.forEach(function (p, pi) {
+        p.best = g.rounds.reduce(function (b, r) {
+          return r.p === pi && !r.edit && !r.bust ? Math.max(b, r.scored) : b;
+        }, 0);
+      });
+      X01.resetLeg(g);
+    },
+
+    /* Everyone back to the start score, whoever starts this leg to throw. */
+    resetLeg: function (g) {
       g.cur = g.legStarter;
       g.players.forEach(function (p) {
         p.score = g.start;
@@ -218,11 +331,13 @@
     avg: function (p) { return p.darts ? (p.scored / p.darts * 3) : 0; },
 
     /* render --------------------------------------------------- */
-    render: function (g) {
+    /* `view` is what the page knows and the game does not: matchLegs, the
+     * points per team in an MBC match, shown in place of legs won. */
+    render: function (g, view) {
       if (g.diddle) return X01.renderDiddle(g);
       var e = UI.esc;
       var p = g.players[g.cur];
-      var left = X01.dartsLeft(g);
+      var matchLegs = view && view.matchLegs;
 
       var header =
         '<header class="topbar">' +
@@ -240,7 +355,7 @@
         var a = X01.avg(pl);
         return '<div class="pcard' + (i === g.cur ? ' on' : '') + '" data-i="' + i + '" data-act="ledger">' +
           '<div class="pc-top"><span class="pc-name">' + UI.nameHtml(pl.name) + '</span>' +
-            (g.matchLegs ? '<span class="pc-legs">' + g.matchLegs[i] + '</span>'
+            (matchLegs ? '<span class="pc-legs">' + matchLegs[i] + '</span>'
               : g.legsToWin > 1 ? '<span class="pc-legs">' + pl.legs + '</span>' : '') + '</div>' +
           '<div class="pc-score">' + pl.score + '</div>' +
           '<div class="pc-meta">' + X01.lastPill(pl.last) +
@@ -258,7 +373,7 @@
         }
       } else {
         /* With fires in play, show the sum being built: "60 + 21 = 81". */
-        var fired = (g.fire || 0) * 60;
+        var fired = g.fire * 60;
         var shown = !fired ? g.pending
           : fired + ' + ' + (g.pending ? g.pending + ' <span class="ph">=</span> ' + X01.pendingTotal(g) : '');
         slots = '<span class="dslot wide' + (X01.hasPending(g) ? ' filled' : '') + '">' +
@@ -321,7 +436,7 @@
     /* Every visit so far, a table per leg: a row per round, a column per
      * player in the scoreboard's order. */
     ledgerHtml: function (g) {
-      var e = UI.esc, rows = g.rounds || [], n = g.players.length, html = '', leg;
+      var e = UI.esc, rows = g.rounds, n = g.players.length, html = '', leg;
       if (!rows.length) return '<p>No rounds yet.</p>';
 
       /* Each copy remembers its place in g.rounds, so a tapped cell can say
@@ -432,7 +547,7 @@
         return 'That would leave the turn in progress on ' + after + '.';
       }
 
-      X01.snapshot(g);
+      X01.snapshot(g, lefts.map(function (kl) { return kl[0]; }));   /* includes ri */
       lefts.forEach(function (kl) { g.rounds[kl[0]].left = kl[1]; });
       p.scored -= delta;
       row.scored = total;
@@ -547,7 +662,7 @@
       var pad = '<div class="pad total">' +
         '<div class="quickrow">' + quick.map(function (q) {
           if (q.fire) {
-            var fits = (g.fire || 0) + q.fire <= 2 && total + q.fire * 60 <= 180;
+            var fits = g.fire + q.fire <= 2 && total + q.fire * 60 <= 180;
             return '<button class="key quick fire" data-act="fire" data-v="' + q.fire + '"' +
               (fits ? '' : ' disabled') +
               ' aria-label="' + UI.esc(q.name) + ', add ' + q.fire * 60 + '">' +

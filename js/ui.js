@@ -13,21 +13,25 @@
 
     /* A team name as scoreboard HTML. Teams with a logo show it (the alt text
      * keeps the name readable to screen readers); everyone else is plain text. */
-    LOGOS: { 'bad news beers': 'img/bad-news-beers.png' },
     nameHtml: function (name) {
-      var src = UI.LOGOS[String(name).trim().toLowerCase()];
+      var src = League.LOGOS[String(name).trim().toLowerCase()];
       return src
         ? '<img class="name-logo" src="' + src + '" alt="' + UI.esc(name) + '">'
         : UI.esc(name);
     },
 
-    clone: function (o) { return JSON.parse(JSON.stringify(o)); },
-
     buzz: function (ms) {
       if (navigator.vibrate) { try { navigator.vibrate(ms || 12); } catch (e) {} }
     },
 
-    /* Modal returning a promise of the chosen action value (null if dismissed). */
+    /* Is a modal up? Input meant for the screen behind it should wait. */
+    modalOpen: function () {
+      return !!(modalRoot && modalRoot.querySelector('.backdrop'));
+    },
+
+    /* Modal returning a promise of the chosen action value (null if dismissed).
+     * `onOpen(wrap, close)` can wire up the body; close(value) resolves the
+     * modal with that value, as if an action carrying it had been tapped. */
     modal: function (opts) {
       modalRoot = modalRoot || document.getElementById('modal-root');
       return new Promise(function (resolve) {
@@ -46,8 +50,12 @@
             '</div>' +
           '</div>';
 
+        var closed = false;
         function close(v) {
+          if (closed) return;
+          closed = true;
           wrap.removeEventListener('click', onClick);
+          document.removeEventListener('keydown', onKeydown);
           wrap.remove();
           resolve(v);
         }
@@ -56,13 +64,21 @@
           var b = e.target.closest('button[data-i]');
           if (!b) return;
           UI.buzz(10);
-          var a = actions[+b.dataset.i];
-          if (a.onPick && a.onPick(wrap) === false) return;
-          close(a.value);
+          close(actions[+b.dataset.i].value);
+        }
+        /* Escape dismisses, like a tap on the backdrop: only the modal on
+         * top, and only one that can be dismissed. */
+        function onKeydown(e) {
+          if (e.key !== 'Escape' || opts.dismissible === false) return;
+          var open = modalRoot.querySelectorAll('.backdrop');
+          if (open[open.length - 1] !== wrap) return;
+          e.preventDefault();
+          close(null);
         }
         wrap.addEventListener('click', onClick);
+        document.addEventListener('keydown', onKeydown);
         modalRoot.appendChild(wrap);
-        if (opts.onOpen) opts.onOpen(wrap);
+        if (opts.onOpen) opts.onOpen(wrap, close);
         var f = wrap.querySelector('input');
         if (f) { f.focus(); f.select(); }
       });
@@ -72,7 +88,7 @@
      * Pass {numeric:true, min, max} for a number pad on touch keyboards. */
     prompt: function (title, value, placeholder, opts) {
       opts = opts || {};
-      if (opts.numeric && document.documentElement.classList.contains('pj-frame')) {
+      if (opts.numeric && Projector.inFrame) {
         return UI.keypadPrompt(title, value, placeholder, opts);
       }
       var input;
@@ -85,18 +101,34 @@
               '" placeholder="' + UI.esc(placeholder || '') + '" autocomplete="off">',
         actions: [
           { label: 'Cancel', value: null },
-          { label: 'Save', value: '\u0000', kind: 'primary' }
+          { label: 'Save', value: true, kind: 'primary' }
         ],
-        onOpen: function (w) {
+        onOpen: function (w, close) {
           input = w.querySelector('input');
           input.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter') w.querySelector('button[data-i="1"]').click();
+            if (e.key === 'Enter') close(true);
           });
         }
       }).then(function (v) {
         if (v === null) return null;
         var t = (input.value || '').trim();
         return t || null;
+      });
+    },
+
+    /* A whole number from min to max. Asks again, after saying why, until it
+     * gets one; resolves to the number, or null if cancelled. */
+    promptNumber: function (title, value, min, max) {
+      return UI.prompt(title, value == null ? '' : String(value), min + '–' + max,
+        { numeric: true, min: min, max: max }
+      ).then(function (val) {
+        if (val === null) return null;
+        var n = parseInt(val, 10);
+        if (/^\d+$/.test(val) && n >= min && n <= max) return n;
+        return UI.modal({
+          title: 'Out of range',
+          html: '<p>Pick a whole number from ' + min + ' to ' + max + '.</p>'
+        }).then(function () { return UI.promptNumber(title, value, min, max); });
       });
     },
 
@@ -117,7 +149,7 @@
           }).join('') + '</div>',
         actions: [
           { label: 'Cancel', value: null },
-          { label: 'Save', value: '\u0000', kind: 'primary' }
+          { label: 'Save', value: true, kind: 'primary' }
         ],
         onOpen: function (w) {
           var shown = w.querySelector('.kp-display');
